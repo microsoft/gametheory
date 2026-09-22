@@ -36,6 +36,7 @@ from gametheory.persistence import (
     ExerciseRunState,
     RunDispatch,
     RunStep,
+    Workspace,
     new_id,
     now,
     session_factory,
@@ -63,22 +64,28 @@ def tick(delay: float = 0, *, done: bool = False) -> Tick:
 def exercise_v1(
     ctx: task.OrchestrationContext, dispatch: str
 ) -> Generator[task.Task[Any], Any, str]:
-    try:
-        while True:
+    while True:
+        try:
             result = yield ctx.call_activity(advance_v1, input=dispatch)
-            if result["done"]:
-                return dispatch
-            if result["delay"] > 0:
-                timer = ctx.create_timer(timedelta(seconds=result["delay"]))
-                control = ctx.wait_for_external_event("control")
-                winner = yield task.when_any([timer, control])
-                if winner == timer:
-                    control.cancel()
-                else:
-                    timer.cancel()
-    except task.TaskFailedError:
-        yield ctx.call_activity(intervene_v1, input=dispatch)
-    return dispatch
+        except task.TaskFailedError:
+            yield ctx.call_activity(
+                intervene_v1,
+                input=dispatch,
+                retry_policy=task.RetryPolicy(
+                    first_retry_interval=timedelta(seconds=5), max_number_of_attempts=3
+                ),
+            )
+            result = tick(30)
+        if result["done"]:
+            return dispatch
+        if result["delay"] > 0:
+            timer = ctx.create_timer(timedelta(seconds=result["delay"]))
+            control = ctx.wait_for_external_event("control")
+            winner = yield task.when_any([timer, control])
+            if winner == timer:
+                control.cancel()
+            else:
+                timer.cancel()
 
 
 def hold(dispatch_id: str, reason: str) -> Tick:
@@ -86,6 +93,9 @@ def hold(dispatch_id: str, reason: str) -> Tick:
         dispatch = db.get(RunDispatch, dispatch_id)
         run = db.get(ExerciseRun, dispatch.run_id) if dispatch else None
         state = db.get(ExerciseRunState, dispatch.run_id) if dispatch else None
+        workspace = db.get(Workspace, run.workspace_id) if run else None
+        if workspace and workspace.organization_id != get_settings().tenant_id:
+            raise ValueError("Dispatch is outside this executor's tenant")
         if (
             run
             and state
@@ -101,6 +111,53 @@ def hold(dispatch_id: str, reason: str) -> Tick:
 
 
 exercise_orchestrator: task.Orchestrator[str, str] = exercise_v1
+
+
+def finish_stop(dispatch_id: str) -> Tick | None:
+    # Accounting a requested stop requires no target access or original operator grant.
+    with session_factory().begin() as db:
+        dispatch = db.get(RunDispatch, dispatch_id)
+        run = db.get(ExerciseRun, dispatch.run_id) if dispatch else None
+        state = db.get(ExerciseRunState, dispatch.run_id) if dispatch else None
+        if not dispatch or not run or not state or not state.stop_requested:
+            return None
+        workspace = db.get(Workspace, run.workspace_id)
+        if workspace is None or workspace.organization_id != get_settings().tenant_id:
+            raise ValueError("Dispatch is outside this executor's tenant")
+        state = db.scalar(
+            select(ExerciseRunState)
+            .where(ExerciseRunState.run_id == run.id)
+            .with_hint(ExerciseRunState, "WITH (UPDLOCK, HOLDLOCK)", dialect_name="mssql")
+            .execution_options(populate_existing=True)
+        )
+        if state is None or state.phase != dispatch.phase or not state.active:
+            return tick(done=True)
+        rows = list(
+            db.scalars(
+                select(RunStep).where(RunStep.run_id == run.id, RunStep.phase == state.phase)
+            )
+        )
+        if any(
+            row.state == "in_flight" and row.lease_until and row.lease_until > now() for row in rows
+        ):
+            return tick(5)
+        for row in rows:
+            if row.state == "in_flight":
+                row.state, row.reason = "unknown", "No confirmed result after an accepted attempt"
+                record_event(
+                    db,
+                    run,
+                    "operation.unknown",
+                    {"reason": row.reason, "phase": state.phase, "attempt_id": row.attempt_id},
+                    row.step_id,
+                )
+        incomplete = any(row.state == "unknown" for row in rows)
+        state.state = "stopped_incomplete" if incomplete else "stopped"
+        state.reason = "Unconfirmed effects remain; stop did not undo them." if incomplete else None
+        state.active = False
+        state.version += 1
+        record_event(db, run, "run.stopped", {"incomplete": incomplete, "phase": state.phase})
+        return tick(done=True)
 
 
 def intervene_v1(_ctx: task.ActivityContext, dispatch_id: str) -> None:
@@ -164,6 +221,9 @@ def runnable(manifest: RunManifest, rows: dict[str, RunStep]) -> tuple[str | Non
 
 
 def advance(dispatch_id: str) -> Tick:
+    stopped = finish_stop(dispatch_id)
+    if stopped is not None:
+        return stopped
     factory = session_factory()
     with factory.begin() as db:
         dispatch = db.get(RunDispatch, dispatch_id)
@@ -291,7 +351,15 @@ def advance(dispatch_id: str) -> Tick:
             left = source.get(condition.result_field)
             if left is None:
                 raise ValueError("Required condition evidence is absent")
-            decision = compare(left, condition.operator, condition.value)
+            _, source_operation, _ = resolve_operation(
+                manifest, str(condition.source_step_id), "exercise"
+            )
+            result_type = next(
+                item.type
+                for item in source_operation.results
+                if item.name == condition.result_field
+            )
+            decision = compare(left, condition.operator, condition.value, result_type)
             row.state, row.result, row.finished_at = (
                 "succeeded",
                 json.dumps({"condition": decision}),
@@ -436,7 +504,12 @@ def advance(dispatch_id: str) -> Tick:
         row.state, row.finished_at = result.outcome, now()
         if result.outcome == "succeeded" and observation:
             value = result.values.get(observation.field)
-            matched = value is not None and compare(value, observation.operator, observation.value)
+            result_type = next(
+                item.type for item in operation.results if item.name == observation.field
+            )
+            matched = value is not None and compare(
+                value, observation.operator, observation.value, result_type
+            )
             record_event(
                 db,
                 run,
@@ -468,7 +541,10 @@ def dispatch_once(client: DurableTaskSchedulerClient) -> None:
             db.scalars(
                 select(RunDispatch.id)
                 .join(ExerciseRunState, ExerciseRunState.run_id == RunDispatch.run_id)
+                .join(ExerciseRun, ExerciseRun.id == RunDispatch.run_id)
+                .join(Workspace, Workspace.id == ExerciseRun.workspace_id)
                 .where(
+                    Workspace.organization_id == get_settings().tenant_id,
                     ExerciseRunState.active == true(),
                     RunDispatch.phase == ExerciseRunState.phase,
                     RunDispatch.next_at <= now(),

@@ -158,6 +158,7 @@ function runFixture() {
     approval_status: 'not_required',
     blockers: ['Target readiness has not been recorded'],
     can_operate: true,
+    can_stop: true,
     can_review: false,
     manifest: {
       trigger: 'manual',

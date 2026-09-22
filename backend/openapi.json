@@ -5897,6 +5897,47 @@
         "title": "PriorResultReference",
         "description": "A required declared result of a guaranteed earlier operation; never evaluated here."
       },
+      "ReadinessView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "configuration_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Configuration Id"
+          },
+          "checked_at": {
+            "type": "string",
+            "title": "Checked At"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "evidence_reference": {
+            "type": "string",
+            "title": "Evidence Reference"
+          },
+          "operator": {
+            "type": "string",
+            "title": "Operator"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "configuration_id",
+          "checked_at",
+          "expires_at",
+          "evidence_reference",
+          "operator"
+        ],
+        "title": "ReadinessView"
+      },
       "RecoveryBinding": {
         "properties": {
           "step_id": {
@@ -6032,6 +6073,56 @@
           "note"
         ],
         "title": "RunApprovalInput"
+      },
+      "RunAuthorizationView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentPolicyView"
+            },
+            "type": "array",
+            "title": "Policies"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/TargetAuthorityView"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "readiness": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessView"
+            },
+            "type": "array",
+            "title": "Readiness"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "created_by",
+          "created_at",
+          "policies",
+          "targets",
+          "readiness"
+        ],
+        "title": "RunAuthorizationView"
       },
       "RunControl": {
         "properties": {
@@ -6447,8 +6538,25 @@
             ],
             "title": "Context Id"
           },
+          "authorization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunAuthorizationView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "approval_required": {
-            "type": "boolean",
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Approval Required"
           },
           "approval_status": {
@@ -6458,7 +6566,8 @@
               "required",
               "approved",
               "rejected",
-              "invalid"
+              "invalid",
+              "unresolved"
             ],
             "title": "Approval Status"
           },
@@ -6472,6 +6581,10 @@
           "can_operate": {
             "type": "boolean",
             "title": "Can Operate"
+          },
+          "can_stop": {
+            "type": "boolean",
+            "title": "Can Stop"
           },
           "can_review": {
             "type": "boolean",
@@ -6512,10 +6625,12 @@
           "manifest_digest",
           "manifest",
           "context_id",
+          "authorization",
           "approval_required",
           "approval_status",
           "blockers",
           "can_operate",
+          "can_stop",
           "can_review",
           "steps",
           "events",
@@ -6769,6 +6884,70 @@
           "value"
         ],
         "title": "StepCondition"
+      },
+      "TargetAuthorityView": {
+        "properties": {
+          "configuration_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Configuration Id"
+          },
+          "resource_id": {
+            "type": "string",
+            "title": "Resource Id"
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint"
+          },
+          "database": {
+            "type": "string",
+            "title": "Database"
+          },
+          "identity_ref": {
+            "type": "string",
+            "title": "Identity Ref"
+          },
+          "client_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Client Id"
+          },
+          "token_scope": {
+            "type": "string",
+            "title": "Token Scope"
+          },
+          "operation_digests": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "type": "array",
+            "title": "Operation Digests"
+          },
+          "replayable_operations": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "type": "array",
+            "title": "Replayable Operations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "configuration_id",
+          "resource_id",
+          "endpoint",
+          "database",
+          "identity_ref",
+          "client_id",
+          "token_scope",
+          "operation_digests",
+          "replayable_operations"
+        ],
+        "title": "TargetAuthorityView"
       },
       "ValidationError": {
         "properties": {

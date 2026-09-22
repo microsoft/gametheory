@@ -52,6 +52,16 @@ def example_manifest(*, effect="read", kind="rest", classification="nonproductio
         ],
         recovery="Explicit versioned recovery or external manual accounting.",
     )
+    if effect == "write":
+        from gametheory.preparation import OperationField
+
+        operation.results = [
+            field.model_copy(update={"required": True}) if field.name == "committed_at" else field
+            for field in operation.results
+        ] + [
+            OperationField(name="outcome", type="string", required=True),
+            OperationField(name="durable_event_id", type="uuid", required=True),
+        ]
     content = ConnectionConfiguration(
         classification=classification,
         resource_id="resource/example",
@@ -168,6 +178,19 @@ def test_manifest_is_separate_immutable_and_historically_parseable():
     assert historical.schema_version == "exercise-execution/v2"
     with pytest.raises(ValidationError):
         RunManifest.model_validate(manifest.preparation.model_dump(mode="json"))
+
+
+def test_unconfirmed_write_contract_cannot_become_an_executable_run():
+    manifest = example_manifest(effect="write")
+    config = manifest.preparation.configurations[0]
+    config.content.catalog.operations[0].results = [
+        field
+        for field in config.content.catalog.operations[0].results
+        if field.name != "durable_event_id"
+    ]
+    config.digest = canonical_digest(config.content.model_dump(mode="json"))
+    with pytest.raises(ValidationError, match="receipt fields"):
+        RunManifest.model_validate(manifest.model_dump())
 
 
 def test_write_observation_and_fabricated_objective_fields_are_rejected():
@@ -391,6 +414,10 @@ def test_conditions_do_not_coerce_boolean_and_numeric_values():
     assert compare(86, "gt", 85) is True
     with pytest.raises(ValueError):
         compare(True, "eq", 1)
+    with pytest.raises(ValueError):
+        compare(True, "gt", False)
+    assert compare("2026-09-22T12:00:00Z", "eq", "2026-09-22T14:00:00+02:00", "datetime")
+    assert compare("2026-09-22T12:00:00.000001Z", "gt", "2026-09-22T12:00:00Z", "datetime")
 
 
 def test_runtime_skips_unselected_branches_and_requires_all_explicit_dependencies():

@@ -1767,6 +1767,27 @@ export interface components {
             /** Field */
             field: string;
         };
+        /** ReadinessView */
+        ReadinessView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Configuration Id
+             * Format: uuid
+             */
+            configuration_id: string;
+            /** Checked At */
+            checked_at: string;
+            /** Expires At */
+            expires_at: string;
+            /** Evidence Reference */
+            evidence_reference: string;
+            /** Operator */
+            operator: string;
+        };
         /** RecoveryBinding */
         RecoveryBinding: {
             /**
@@ -1827,6 +1848,27 @@ export interface components {
             expires_at: string;
             /** Note */
             note: string;
+        };
+        /** RunAuthorizationView */
+        RunAuthorizationView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /** Created At */
+            created_at: string;
+            /** Policies */
+            policies: components["schemas"]["EnvironmentPolicyView"][];
+            /** Targets */
+            targets: components["schemas"]["TargetAuthorityView"][];
+            /** Readiness */
+            readiness: components["schemas"]["ReadinessView"][];
         };
         /** RunControl */
         RunControl: {
@@ -1999,17 +2041,20 @@ export interface components {
             manifest: components["schemas"]["RunManifest"];
             /** Context Id */
             context_id: string | null;
+            authorization: components["schemas"]["RunAuthorizationView"] | null;
             /** Approval Required */
-            approval_required: boolean;
+            approval_required: boolean | null;
             /**
              * Approval Status
              * @enum {string}
              */
-            approval_status: "not_required" | "required" | "approved" | "rejected" | "invalid";
+            approval_status: "not_required" | "required" | "approved" | "rejected" | "invalid" | "unresolved";
             /** Blockers */
             blockers: string[];
             /** Can Operate */
             can_operate: boolean;
+            /** Can Stop */
+            can_stop: boolean;
             /** Can Review */
             can_review: boolean;
             /** Steps */
@@ -2108,6 +2153,33 @@ export interface components {
             if_true?: string[];
             /** If False */
             if_false?: string[];
+        };
+        /** TargetAuthorityView */
+        TargetAuthorityView: {
+            /**
+             * Configuration Id
+             * Format: uuid
+             */
+            configuration_id: string;
+            /** Resource Id */
+            resource_id: string;
+            /** Endpoint */
+            endpoint: string;
+            /** Database */
+            database: string;
+            /** Identity Ref */
+            identity_ref: string;
+            /**
+             * Client Id
+             * Format: uuid
+             */
+            client_id: string;
+            /** Token Scope */
+            token_scope: string;
+            /** Operation Digests */
+            operation_digests: string[];
+            /** Replayable Operations */
+            replayable_operations: string[];
         };
         /** ValidationError */
         ValidationError: {

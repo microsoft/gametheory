@@ -111,6 +111,13 @@ class Settings(BaseSettings):
         if self.execution_enabled:
             if self.cloud != "commercial" or not profile.scheduler_supported:
                 raise ValueError("Exercise execution requires the commercial Scheduler runtime")
+            if (
+                profile.authority.rstrip("/") != "https://login.microsoftonline.com"
+                or profile.scheduler_scope != "https://durabletask.io/.default"
+            ):
+                raise ValueError(
+                    "Exercise execution requires the commercial authority and Scheduler audience"
+                )
             if not all(
                 [
                     self.sql_url,

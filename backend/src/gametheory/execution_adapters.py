@@ -14,6 +14,7 @@ from azure.identity import ManagedIdentityCredential
 from fastapi import HTTPException
 from pydantic import Field, TypeAdapter, ValidationError
 from sqlalchemy import URL, create_engine, event, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
 
 from gametheory.config import get_settings
@@ -63,6 +64,15 @@ class TargetBinding(Contract):
         match = next((item for item in self.operations if item.digest == digest), None)
         if match is None:
             raise HTTPException(409, "Operation is not authorized by the operator target binding")
+        if (
+            match.safe_replay
+            and operation.effect == "write"
+            and operation.invocation.kind == "sql"
+            and not any(field.name == "idempotency_key" for field in operation.parameters)
+        ):
+            raise HTTPException(
+                409, "Safe SQL replay requires a dispatcher-owned idempotency parameter"
+            )
         return match
 
 
@@ -108,14 +118,32 @@ def binding_for(
         )
     ):
         raise HTTPException(409, "Target or identity differs from its approved configuration")
+    if config.connection_kind == "sql" and get_settings().sql_url:
+        application = make_url(get_settings().sql_url)
+        if (application.host or "").casefold() == binding.endpoint.casefold() and (
+            application.database or ""
+        ).casefold() == binding.database.casefold():
+            raise HTTPException(409, "The application database cannot be an exercise target")
     if config.connection_kind == "rest":
         safe_endpoint(binding.endpoint)
         if urlparse(binding.endpoint).scheme != "https":
             raise HTTPException(409, "Authenticated execution targets must use HTTPS")
+        if urlparse(binding.endpoint).hostname in {
+            "graph.microsoft.com",
+            "graph.microsoft.us",
+            "dod-graph.microsoft.us",
+            "microsoftgraph.chinacloudapi.cn",
+        }:
+            raise HTTPException(
+                409, "Microsoft Graph requires the separately implemented notification gate"
+            )
         if not binding.token_scope.startswith("api://") and not binding.token_scope.startswith(
             "https://"
         ):
             raise HTTPException(409, "REST execution requires an explicit approved token audience")
+        scope = urlparse(binding.token_scope)
+        if scope.username or scope.password or scope.query or scope.fragment or not scope.netloc:
+            raise HTTPException(409, "Token audience must be a non-secret resource scope")
     return binding
 
 
@@ -278,6 +306,11 @@ def rest_call(
                 params=remaining if operation.invocation.method == "GET" else None,
                 json=remaining if operation.invocation.method != "GET" else None,
             ) as response:
+                if response.status_code == 202 and operation.effect == "write":
+                    return AdapterResult(
+                        outcome="unknown",
+                        reason="Provider acceptance is not a confirmed completed effect; reconciliation is required",
+                    )
                 if not 200 <= response.status_code < 300:
                     status = response.status_code
                     outcome: Outcome = (

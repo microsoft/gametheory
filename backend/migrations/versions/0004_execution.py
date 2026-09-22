@@ -81,6 +81,7 @@ def upgrade():
         sa.Column("phase", sa.String(16), nullable=False),
         sa.Column("policy_versions", sa.UnicodeText(), nullable=False),
         sa.Column("binding_digest", sa.String(64), nullable=False),
+        sa.Column("target_bindings", sa.UnicodeText(), nullable=False),
         sa.Column("readiness_ids", sa.UnicodeText(), nullable=False),
         sa.Column("approval_required", sa.Boolean(), nullable=False),
         ident("actor"),
@@ -94,10 +95,13 @@ def upgrade():
         ident("reviewer"),
         ident("grant_id", "execution_grants.id"),
         sa.Column("decision", sa.String(16), nullable=False),
+        sa.Column("sequence", sa.Integer(), nullable=False),
         clock("expires_at"),
         sa.Column("note", sa.Unicode(2000), nullable=False),
         clock(),
         sa.CheckConstraint("decision IN ('approved', 'rejected')", name="ck_run_approval_decision"),
+        sa.UniqueConstraint("context_id", "sequence", name="uq_run_approval_sequence"),
+        sa.CheckConstraint("sequence >= 1", name="ck_run_approval_sequence"),
     )
     op.create_index("ix_run_approvals_context_id", "run_approvals", ["context_id"])
     op.create_table(

@@ -7,11 +7,13 @@ from uuid import UUID
 from pydantic import Field, StrictInt, model_validator
 
 from gametheory.domain import Contract
+from gametheory.environment_policy import EnvironmentPolicyView
 from gametheory.preparation import (
     Digest,
     ExplicitDatetime,
     FieldName,
     OperationBinding,
+    OperationDefinition,
     PreparationManifest,
     PriorResultReference,
     Scalar,
@@ -85,6 +87,8 @@ class RecoveryBinding(Contract):
 
     @model_validator(mode="after")
     def owned_versioned_recovery(self) -> Self:
+        if "idempotency_key" in self.parameters:
+            raise ValueError("Recovery SQL idempotency keys are dispatcher-owned")
         if self.ownership_parameter == self.version_parameter:
             raise ValueError("Ownership and version preconditions must be separate")
         for name in (self.ownership_parameter, self.version_parameter):
@@ -105,6 +109,22 @@ class RunCreate(Contract):
     recovery: list[RecoveryBinding] = Field(default_factory=list, max_length=100)
 
 
+def require_mutation_receipt(operation: OperationDefinition) -> None:
+    if operation.effect != "write":
+        return
+    fields = {item.name: item for item in operation.results}
+    for name, kind in (
+        ("outcome", "string"),
+        ("durable_event_id", "uuid"),
+        ("committed_at", "datetime"),
+    ):
+        field = fields.get(name)
+        if field is None or not field.required or field.type != kind:
+            raise ValueError(
+                "Writes require declared outcome, durable_event_id, and committed_at receipt fields"
+            )
+
+
 class RunManifest(Contract):
     schema_version: Literal["exercise-execution/v2"] = "exercise-execution/v2"
     run_id: UUID
@@ -120,7 +140,7 @@ class RunManifest(Contract):
     def executable(self) -> Self:
         prep = self.preparation
         operations = validate_bindings(prep.draft, prep.configurations, prep.scenario)
-        if not prep.draft.steps or prep.draft.window is None:
+        if not operations or prep.draft.window is None:
             raise ValueError("Execution needs operations and an explicit bounded window")
         if not prep.draft.recovery.strip():
             raise ValueError("Record a recovery decision before execution")
@@ -140,14 +160,17 @@ class RunManifest(Contract):
             operation = operations.get(step.id)
             if operation is None or operation.effect == "notify":
                 raise ValueError("Every operation needs a supported exact binding")
+            require_mutation_receipt(operation)
             for field in operation.parameters:
                 if operation.invocation.kind == "sql" and field.name == "idempotency_key":
                     if step.parameters.get(field.name) is not None:
                         raise ValueError(
                             "Clear the SQL idempotency_key literal; execution explicitly owns that binding"
                         )
-                    if field.type != "string" or (
-                        field.max_length is not None and field.max_length < 64
+                    if (
+                        field.type != "string"
+                        or field.choices
+                        or (field.max_length is not None and field.max_length < 64)
                     ):
                         raise ValueError(
                             "SQL idempotency_key must accommodate a dispatcher SHA-256 key"
@@ -257,6 +280,7 @@ class RunManifest(Contract):
                 or operation.effect != "write"
             ):
                 raise ValueError("Recovery must bind a registered write for a recorded write")
+            require_mutation_receipt(operation)
             names = {field.name for field in operation.parameters}
             if not set(recovery.parameters) <= names:
                 raise ValueError("Recovery parameters must be declared")
@@ -353,6 +377,36 @@ class ObjectiveFinding(Contract):
     evidence_ids: list[UUID]
 
 
+class TargetAuthorityView(Contract):
+    configuration_id: UUID
+    resource_id: str
+    endpoint: str
+    database: str
+    identity_ref: str
+    client_id: UUID
+    token_scope: str
+    operation_digests: list[Digest]
+    replayable_operations: list[Digest]
+
+
+class ReadinessView(Contract):
+    id: UUID
+    configuration_id: UUID
+    checked_at: str
+    expires_at: str
+    evidence_reference: str
+    operator: str
+
+
+class RunAuthorizationView(Contract):
+    id: UUID
+    created_by: UUID
+    created_at: str
+    policies: list[EnvironmentPolicyView]
+    targets: list[TargetAuthorityView]
+    readiness: list[ReadinessView]
+
+
 class RunView(Contract):
     id: UUID
     board_id: UUID
@@ -364,10 +418,14 @@ class RunView(Contract):
     manifest_digest: Digest
     manifest: RunManifest
     context_id: UUID | None
-    approval_required: bool
-    approval_status: Literal["not_required", "required", "approved", "rejected", "invalid"]
+    authorization: RunAuthorizationView | None
+    approval_required: bool | None
+    approval_status: Literal[
+        "not_required", "required", "approved", "rejected", "invalid", "unresolved"
+    ]
     blockers: list[str]
     can_operate: bool
+    can_stop: bool
     can_review: bool
     steps: list[RunStepView]
     events: list[RunEventView]
@@ -383,21 +441,31 @@ class RunSummary(Contract):
     created_at: str
 
 
-def compare(left: Scalar, operator: Comparator, right: Scalar) -> bool:
+def compare(
+    left: Scalar, operator: Comparator, right: Scalar, data_type: str | None = None
+) -> bool:
     # Do not coerce booleans/strings to numbers when evaluating runtime evidence.
     if isinstance(left, bool) != isinstance(right, bool):
         raise ValueError("Comparison types differ")
     if isinstance(left, str) != isinstance(right, str):
         raise ValueError("Comparison types differ")
+    if (
+        isinstance(left, str)
+        and isinstance(right, str)
+        and (data_type == "datetime" or operator not in {"eq", "ne"})
+    ):
+        a, b = datetime.fromisoformat(left), datetime.fromisoformat(right)
+        if a.tzinfo is None or b.tzinfo is None:
+            raise ValueError("Comparison timestamps require timezones")
+        return {"eq": a == b, "ne": a != b, "gt": a > b, "gte": a >= b, "lt": a < b, "lte": a <= b}[
+            operator
+        ]
     if operator == "eq":
         return left == right
     if operator == "ne":
         return left != right
-    if isinstance(left, str) and isinstance(right, str):
-        a, b = datetime.fromisoformat(left), datetime.fromisoformat(right)
-        if a.tzinfo is None or b.tzinfo is None:
-            raise ValueError("Comparison timestamps require timezones")
-        left, right = a.timestamp(), b.timestamp()
+    if isinstance(left, bool) or isinstance(right, bool):
+        raise ValueError("Booleans do not support ordered comparison")
     if not isinstance(left, (int, float)) or not isinstance(right, (int, float)):
         raise ValueError("Ordered comparison needs numbers or timestamps")
     return {"gt": left > right, "gte": left >= right, "lt": left < right, "lte": left <= right}[

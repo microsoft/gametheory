@@ -397,6 +397,7 @@ class RunAuthorization(Base):
     phase: Mapped[str] = mapped_column(String(16))
     policy_versions: Mapped[str] = mapped_column(UnicodeText)
     binding_digest: Mapped[str] = mapped_column(String(64))
+    target_bindings: Mapped[str] = mapped_column(UnicodeText)
     readiness_ids: Mapped[str] = mapped_column(UnicodeText)
     approval_required: Mapped[bool] = mapped_column(Boolean)
     actor: Mapped[str] = mapped_column(String(36))
@@ -407,12 +408,15 @@ class RunApproval(Base):
     __tablename__ = "run_approvals"
     __table_args__ = (
         CheckConstraint("decision IN ('approved', 'rejected')", name="ck_run_approval_decision"),
+        UniqueConstraint("context_id", "sequence", name="uq_run_approval_sequence"),
+        CheckConstraint("sequence >= 1", name="ck_run_approval_sequence"),
     )
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     context_id: Mapped[str] = mapped_column(ForeignKey("run_authorizations.id"), index=True)
     reviewer: Mapped[str] = mapped_column(String(36))
     grant_id: Mapped[str] = mapped_column(ForeignKey("execution_grants.id"))
     decision: Mapped[str] = mapped_column(String(16))
+    sequence: Mapped[int] = mapped_column(Integer)
     expires_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME)
     note: Mapped[str] = mapped_column(Unicode(2000))
     created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import type { components } from './api.generated'
 import { ApiError, ErrorNotice, useSession } from './api'
 import { exportJson, UnsavedChanges } from './PreparationShared'
@@ -11,6 +11,12 @@ type Schemas = components['schemas']
 type Run = Schemas['RunView']
 type Action = Schemas['RunControl']['action']
 const emptyBindings = '{\n  "observations": [],\n  "objectives": [],\n  "recovery": []\n}'
+export type RunSetupInput = { dirty: boolean; trigger: 'manual' | 'scheduled'; options: string }
+export const emptyRunSetup: RunSetupInput = {
+  dirty: false,
+  trigger: 'manual',
+  options: emptyBindings,
+}
 
 export function runOptions(text: string): Record<string, unknown> {
   const value = parseUniqueJson(text)
@@ -31,17 +37,20 @@ export function BoardRuns({
   version,
   preview,
   unsaved,
+  onInputChange,
 }: {
   wid: string
   bid: string
   version: number
   preview?: Preview
   unsaved: boolean
+  onInputChange?: (input: RunSetupInput) => void
 }) {
   const { api } = useSession()
-  const navigate = useNavigate()
+  const cache = useQueryClient()
   const [trigger, setTrigger] = useState<'manual' | 'scheduled'>('manual')
   const [options, setOptions] = useState(emptyBindings)
+  const [createdId, setCreatedId] = useState('')
   const path = `/workspaces/${wid}/boards/${bid}/runs`
   const runs = useQuery({
     queryKey: [wid, 'board-runs', bid],
@@ -77,9 +86,19 @@ export function BoardRuns({
     },
     onSuccess: (run) => {
       setOptions(emptyBindings)
-      navigate(`/w/${wid}/runs/${run.id}`)
+      setTrigger('manual')
+      setCreatedId(run.id)
+      void cache.invalidateQueries({ queryKey: [wid, 'board-runs', bid] })
     },
   })
+  useEffect(() => {
+    onInputChange?.({
+      dirty: !createdId && (options !== emptyBindings || trigger !== 'manual' || create.isPending),
+      options,
+      trigger,
+    })
+  }, [options, trigger, create.isPending, createdId, onInputChange])
+  useEffect(() => () => onInputChange?.(emptyRunSetup), [onInputChange])
   return (
     <>
       <section className="glass preparation-panel">
@@ -89,6 +108,15 @@ export function BoardRuns({
           requires independent approval; other environments follow their administrator policy.
         </p>
         <ErrorNotice error={runs.error ?? grants.error ?? me.error ?? create.error} />
+        {createdId && (
+          <p className="notice" role="status">
+            Run frozen.{' '}
+            <Link to={`/w/${wid}/runs/${createdId}`}>
+              Review its policy, readiness, and execution controls
+            </Link>
+            .
+          </p>
+        )}
         {!operator && grants.data && (
           <p className="notice">
             An administrator must grant you explicit operator access before you can create a run.
@@ -113,6 +141,7 @@ export function BoardRuns({
               value={trigger}
               disabled={create.isPending}
               onChange={(event) => {
+                setCreatedId('')
                 if (event.target.value === 'manual' || event.target.value === 'scheduled')
                   setTrigger(event.target.value)
               }}
@@ -135,7 +164,10 @@ export function BoardRuns({
                 className="run-json-input"
                 value={options}
                 disabled={create.isPending}
-                onChange={(event) => setOptions(event.target.value)}
+                onChange={(event) => {
+                  setCreatedId('')
+                  setOptions(event.target.value)
+                }}
                 spellCheck={false}
               />
             </label>
@@ -326,6 +358,7 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
       </main>
     )
   const canAct = run.can_operate && !busy && !!note.trim()
+  const canSafetyAct = run.can_stop && !busy && !!note.trim()
   const active = [
     'queued',
     'scheduled',
@@ -362,7 +395,9 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
             {run.manifest.preparation.draft.name} · {run.id.slice(0, 8)}
           </p>
         </div>
-        <span className="pill run-state">{run.state.replaceAll('_', ' ')}</span>
+        <span className="pill run-state" role="status" aria-live="polite">
+          {run.state.replaceAll('_', ' ')}
+        </span>
       </div>
       <ErrorNotice error={error} />
       {error instanceof ApiError && error.status === 409 && (
@@ -381,9 +416,11 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
           <section className="glass preparation-panel">
             <h2>Execution authority</h2>
             <strong>
-              {run.approval_required
-                ? `Independent approval ${run.approval_status.replaceAll('_', ' ')}`
-                : 'Approval not required by environment policy'}
+              {run.approval_status === 'unresolved'
+                ? 'Environment approval policy is unresolved'
+                : run.approval_required
+                  ? `Independent approval ${run.approval_status.replaceAll('_', ' ')}`
+                  : 'Approval not required by environment policy'}
             </strong>
             <p>
               Preparation review is separate. Every external action rechecks current policies,
@@ -401,6 +438,49 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
                 <code className="preparation-digest">{run.manifest_digest}</code>
               </dd>
             </dl>
+            {run.authorization && (
+              <details>
+                <summary>Policies, resolved identities, and readiness receipts</summary>
+                <p>
+                  Authorization requested by <code>{run.authorization.created_by}</code> at{' '}
+                  {new Date(run.authorization.created_at).toLocaleString()}. These are the pinned
+                  records, not a claim that this page performed live probes.
+                </p>
+                <ul className="preparation-list">
+                  {run.authorization.policies.map((policy) => (
+                    <li key={policy.environment_id}>
+                      <strong>
+                        {policy.name} · policy version {policy.version}
+                      </strong>
+                      <span>
+                        {policy.classification} ·{' '}
+                        {policy.approval_required
+                          ? 'Independent approval required'
+                          : 'Approval not required'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <h3>Resolved target identities</h3>
+                <pre className="run-evidence">
+                  {JSON.stringify(run.authorization.targets, null, 2)}
+                </pre>
+                <h3>Operator-attested readiness</h3>
+                <ul className="preparation-list">
+                  {run.authorization.readiness.map((receipt) => (
+                    <li key={receipt.id}>
+                      <code>{receipt.id}</code>
+                      <span>{receipt.evidence_reference}</span>
+                      <span>
+                        Checked {new Date(receipt.checked_at).toLocaleString()}; expires{' '}
+                        {new Date(receipt.expires_at).toLocaleString()}
+                      </span>
+                      <small>Attested by {receipt.operator}</small>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
             {run.blockers.length > 0 && (
               <div className="notice">
                 <strong>Current blockers</strong>
@@ -512,7 +592,7 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
         </section>
         <aside className="stack" aria-label="Run actions">
           <section className="glass preparation-panel">
-            <h2>{run.can_operate ? 'Operator controls' : 'Read-only run access'}</h2>
+            <h2>{run.can_stop ? 'Operator controls' : 'Read-only run access'}</h2>
             <label>
               Operator / reviewer note
               <textarea
@@ -522,7 +602,7 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
                 onChange={(event) => setNote(event.target.value)}
               />
             </label>
-            {run.can_operate && (
+            {run.can_stop && (
               <div className="run-controls">
                 {['prepared', 'paused', 'intervention'].includes(run.state) && (
                   <button disabled={!canAct} onClick={() => control.mutate('authorize')}>
@@ -571,7 +651,7 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
                 {(active || run.state === 'prepared') && (
                   <button
                     className="danger"
-                    disabled={!canAct}
+                    disabled={!canSafetyAct}
                     onClick={() => {
                       if (
                         window.confirm(
@@ -677,7 +757,7 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
               effects. Email cannot be undone.
             </p>
           </section>
-          {run.can_operate && manualItems.length > 0 && (
+          {run.can_stop && manualItems.length > 0 && (
             <section className="glass preparation-panel">
               <h2>External outcome report</h2>
               <p>
@@ -695,6 +775,7 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
                   Unresolved item
                   <select
                     required
+                    disabled={busy}
                     value={manualStep}
                     onChange={(event) => setManualStep(event.target.value)}
                   >
@@ -713,12 +794,13 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
                   External evidence reference
                   <input
                     required
+                    disabled={busy}
                     maxLength={512}
                     value={evidence}
                     onChange={(event) => setEvidence(event.target.value)}
                   />
                 </label>
-                <button disabled={!canAct || !manualStep || !evidence.trim()}>
+                <button disabled={!canSafetyAct || !manualStep || !evidence.trim()}>
                   Record external report
                 </button>
               </form>

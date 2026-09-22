@@ -263,3 +263,41 @@ def test_run_attempt_events_are_append_only_in_runtime_grants():
     assert API_PERMISSIONS["run_authorizations"] == "SELECT, INSERT"
     assert "execution_grants" not in WORKER_PERMISSIONS
     assert "target_readiness" not in WORKER_PERMISSIONS
+
+
+def test_other_explicit_operator_can_stop_after_original_grant_is_revoked(
+    sql_client,
+    sql_factory,
+    monkeypatch,
+    tmp_path,
+):
+    case = execution_case(sql_client, sql_factory, monkeypatch, tmp_path)
+    require(case.control("authorize"))
+    require(case.control("start"))
+    replacement = Principal(case.actor.tenant, str(uuid4()))
+    require(
+        case.client.put(
+            case.workspace + "/members", json={"object_id": replacement.object_id, "role": "viewer"}
+        )
+    )
+    require(
+        case.client.put(
+            case.workspace + "/execution-grants",
+            json={"object_id": replacement.object_id, "capability": "operator"},
+        )
+    )
+    assert (
+        case.client.delete(
+            case.workspace + f"/execution-grants/{case.actor.object_id}/operator"
+        ).status_code
+        == 204
+    )
+    app.dependency_overrides[authenticate] = lambda: replacement
+    current = require(case.client.get(case.run_path))
+    assert current["can_stop"] and not current["can_operate"]
+    stopped = require(case.control("stop"))
+    assert stopped["state"] == "stopped"
+    calls = []
+    monkeypatch.setattr(worker, "invoke", lambda *_: calls.append(True))
+    assert worker.advance(dispatch_for(sql_factory, case.run["id"]))["done"]
+    assert not calls

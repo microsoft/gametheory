@@ -6,7 +6,7 @@ from pydantic import TypeAdapter
 
 from gametheory.execution import ObjectiveFinding, RunManifest, compare
 from gametheory.persistence import RunEvent
-from gametheory.preparation import PriorResultReference, Scalar
+from gametheory.preparation import PriorResultReference, Scalar, validate_bindings
 
 RESULTS = TypeAdapter(dict[str, Scalar | None])
 
@@ -22,6 +22,11 @@ def evidence_time(value: Scalar | None) -> datetime | None:
 
 
 def findings(manifest: RunManifest, events: list[RunEvent]) -> list[ObjectiveFinding]:
+    operations = validate_bindings(
+        manifest.preparation.draft,
+        manifest.preparation.configurations,
+        manifest.preparation.scenario,
+    )
     samples: dict[str, list[tuple[RunEvent, dict[str, Scalar | None]]]] = {}
     for event in events:
         if event.kind not in {"operation.succeeded", "observation"} or event.step_id is None:
@@ -72,7 +77,12 @@ def findings(manifest: RunManifest, events: list[RunEvent]) -> list[ObjectiveFin
                 finding.reason = "A declared optional evidence field is missing."
                 continue
             try:
-                satisfied = compare(left, rule.operator, right)
+                result_type = next(
+                    item.type
+                    for item in operations[rule.step_id].results
+                    if item.name == rule.field
+                )
+                satisfied = compare(left, rule.operator, right, result_type)
             except ValueError:
                 finding.reason = "Evidence types are inconsistent."
                 continue

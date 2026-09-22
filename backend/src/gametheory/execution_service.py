@@ -4,30 +4,35 @@ from datetime import UTC, timedelta
 from uuid import UUID, uuid5
 
 from fastapi import HTTPException
+from pydantic import TypeAdapter
 from sqlalchemy import exists, select, true, update
 from sqlalchemy.orm import Session
 
 from gametheory.auth import Principal, authorize, is_admin, require_admin
 from gametheory.config import get_settings
-from gametheory.environment_policy import latest_policy
+from gametheory.environment_policy import latest_policy, policy_view
 from gametheory.execution import (
     Capability,
     ExecutionGrantInput,
     ExecutionGrantView,
     ManualRecoveryInput,
+    ReadinessView,
     RunApprovalInput,
+    RunAuthorizationView,
     RunControl,
     RunCreate,
     RunEventView,
     RunManifest,
     RunStepView,
     RunView,
+    TargetAuthorityView,
 )
 from gametheory.execution_adapters import TargetBinding, binding_for, bindings
 from gametheory.persistence import (
     BoardContributor,
     BoardOrigin,
     Environment,
+    EnvironmentPolicyRecord,
     ExecutionGrant,
     ExecutionGrantRevocation,
     ExerciseRun,
@@ -236,6 +241,7 @@ def reviewer_allowed(db: Session, actor: Principal, run: ExerciseRun) -> bool:
 @dataclass
 class Authorization:
     required: bool = False
+    policy_resolved: bool = True
     policies: dict[str, int] = field(default_factory=dict)
     targets: dict[UUID, TargetBinding] = field(default_factory=dict)
     readiness: list[str] = field(default_factory=list)
@@ -294,6 +300,8 @@ def check_authorization(
             if environment is None or environment.organization_id != actor.tenant:
                 raise HTTPException(409, "Environment is unavailable")
             policy = latest_policy(db, environment.id)
+            if policy.classification == "unknown":
+                result.policy_resolved = False
             result.policies[environment.id] = policy.version
             result.required |= (
                 policy.approval_required
@@ -353,28 +361,43 @@ def check_authorization(
                 raise HTTPException(409, "Asset integrity changed")
         except HTTPException:
             result.blockers.append("A pinned asset is no longer available")
+    context_matches = False
+    if context:
+        try:
+            pinned_targets = stored_bindings(context)
+            context_matches = (
+                context.run_id == run.id
+                and context.phase == state.phase
+                and json.loads(context.policy_versions) == result.policies
+                and context.binding_digest == result.binding_digest
+                and canonical_digest(
+                    {str(item.configuration_id): item.digest for item in pinned_targets}
+                )
+                == context.binding_digest
+                and len({item.configuration_id for item in pinned_targets}) == len(pinned_targets)
+                and sorted(json.loads(context.readiness_ids)) == sorted(result.readiness)
+                and context.approval_required == result.required
+            )
+        except HTTPException as exc:
+            result.blockers.append(str(exc.detail))
     if require_context:
         if context is None:
             result.blockers.append(
                 "Authorize this exact run under the current environment policies"
             )
-        elif (
-            context.run_id != run.id
-            or context.phase != state.phase
-            or json.loads(context.policy_versions) != result.policies
-            or context.binding_digest != result.binding_digest
-            or sorted(json.loads(context.readiness_ids)) != sorted(result.readiness)
-            or context.approval_required != result.required
-        ):
+        elif not context_matches:
             result.blockers.append(
                 "Authorization context changed; explicit reauthorization is required"
             )
+    result.policy_resolved &= set(result.policies) == {
+        str(config.environment_id) for config in manifest.preparation.configurations
+    }
     result.approval_status = "required" if result.required else "not_required"
     if result.required and context and require_context:
         approval = db.scalar(
             select(RunApproval)
             .where(RunApproval.context_id == context.id)
-            .order_by(RunApproval.created_at.desc(), RunApproval.id.desc())
+            .order_by(RunApproval.sequence.desc())
             .limit(1)
         )
         result.approval = approval
@@ -391,6 +414,7 @@ def check_authorization(
                 result.approval_status = "rejected"
             elif (
                 reviewer_valid
+                and context_matches
                 and reviewer_grant
                 and reviewer_grant.id == approval.grant_id
                 and approval.expires_at > current
@@ -401,14 +425,26 @@ def check_authorization(
                 result.approval_status = "approved"
     if require_approval and result.required and result.approval_status != "approved":
         result.blockers.append("A current independent execution approval is required")
+    if not result.policy_resolved:
+        result.approval_status = "unresolved"
+        result.blockers.append("Environment approval policy could not be resolved")
     return result
 
 
-def require_operator(db: Session, actor: Principal, run: ExerciseRun) -> None:
-    if actor.object_id != run.operator:
-        raise HTTPException(403, "Only this run's explicitly granted operator may control it")
+def stored_bindings(context: RunAuthorization) -> list[TargetBinding]:
+    try:
+        return TypeAdapter(list[TargetBinding]).validate_json(context.target_bindings)
+    except ValueError as exc:
+        raise HTTPException(409, "The immutable execution target snapshot is invalid") from exc
+
+
+def require_operator(
+    db: Session, actor: Principal, run: ExerciseRun, *, original: bool = True
+) -> None:
     grant = grant_record(db, run.workspace_id, actor.object_id, "operator")
-    if grant is None or grant.id != run.grant_id:
+    if grant is None:
+        raise HTTPException(403, "An explicit execution operator grant is required")
+    if original and (actor.object_id != run.operator or grant.id != run.grant_id):
         raise HTTPException(403, "The original execution operator grant is no longer active")
 
 
@@ -418,6 +454,12 @@ def run_view(
     from gametheory.execution_evidence import findings
 
     check = check_authorization(db, actor, run, state, manifest)
+    authority = None
+    if state.context_id:
+        try:
+            authority = authorization_view(db, run, state.context_id, manifest)
+        except HTTPException as exc:
+            check.blockers.append(str(exc.detail))
     events = list(
         db.scalars(
             select(RunEvent)
@@ -443,7 +485,8 @@ def run_view(
             "manifest_digest": run.digest,
             "manifest": manifest,
             "context_id": state.context_id,
-            "approval_required": check.required,
+            "authorization": authority,
+            "approval_required": check.required if check.policy_resolved else None,
             "approval_status": check.approval_status,
             "blockers": list(
                 dict.fromkeys(([state.reason] if state.reason else []) + check.blockers)
@@ -451,6 +494,7 @@ def run_view(
             "can_operate": actor.object_id == run.operator
             and operator_grant is not None
             and operator_grant.id == run.grant_id,
+            "can_stop": operator_grant is not None,
             "can_review": reviewer_allowed(db, actor, run),
             "steps": [
                 RunStepView.model_validate(
@@ -481,6 +525,72 @@ def run_view(
             ],
             "findings": findings(manifest, events),
         }
+    )
+
+
+def authorization_view(
+    db: Session,
+    run: ExerciseRun,
+    context_id: str,
+    manifest: RunManifest,
+) -> RunAuthorizationView:
+    context = db.get(RunAuthorization, context_id)
+    if context is None or context.run_id != run.id:
+        raise HTTPException(409, "Execution authorization details are unavailable")
+    targets = stored_bindings(context)
+    configs = {str(item.id): item for item in manifest.preparation.configurations}
+    if {str(item.configuration_id) for item in targets} != set(configs) or canonical_digest(
+        {str(item.configuration_id): item.digest for item in targets}
+    ) != context.binding_digest:
+        raise HTTPException(409, "Execution target snapshot integrity check failed")
+    policies = []
+    environments = {str(item.environment_id) for item in manifest.preparation.configurations}
+    versions = json.loads(context.policy_versions)
+    if set(versions) != environments:
+        raise HTTPException(409, "Execution policy snapshot is unavailable")
+    for eid, version in versions.items():
+        environment = db.get(Environment, eid)
+        record = db.get(EnvironmentPolicyRecord, (eid, version))
+        if environment is None or record is None:
+            raise HTTPException(409, "Execution policy history is unavailable")
+        policies.append(policy_view(environment, record))
+    receipts = []
+    for receipt_id in json.loads(context.readiness_ids):
+        receipt = db.get(TargetReadiness, receipt_id)
+        if receipt is None or receipt.configuration_id not in configs:
+            raise HTTPException(409, "Execution readiness evidence is unavailable")
+        receipts.append(
+            ReadinessView(
+                id=UUID(receipt.id),
+                configuration_id=UUID(receipt.configuration_id),
+                checked_at=timestamp(receipt.checked_at),
+                expires_at=timestamp(receipt.expires_at),
+                evidence_reference=receipt.evidence_reference,
+                operator=receipt.actor,
+            )
+        )
+    return RunAuthorizationView(
+        id=UUID(context.id),
+        created_by=UUID(context.actor),
+        created_at=timestamp(context.created_at),
+        policies=policies,
+        readiness=receipts,
+        targets=[
+            TargetAuthorityView(
+                configuration_id=target.configuration_id,
+                resource_id=target.resource_id,
+                endpoint=target.endpoint,
+                database=target.database,
+                identity_ref=target.identity_ref,
+                client_id=target.client_id,
+                token_scope=target.token_scope,
+                operation_digests=[item.digest for item in target.operations],
+                replayable_operations=[
+                    item.digest for item in target.operations if item.safe_replay
+                ],
+            )
+            for target in targets
+        ],
     )
 
 
@@ -554,6 +664,9 @@ def authorize_run(
         phase=state.phase,
         policy_versions=json.dumps(check.policies),
         binding_digest=check.binding_digest,
+        target_bindings=json.dumps(
+            [item.model_dump(mode="json") for item in check.targets.values()]
+        ),
         readiness_ids=json.dumps(check.readiness),
         approval_required=check.required,
         actor=actor.object_id,
@@ -608,6 +721,7 @@ def decide_run(
         reviewer=actor.object_id,
         grant_id=grant.id,
         decision=body.decision,
+        sequence=state.version,
         expires_at=expiry,
         note=body.note,
     )
@@ -670,8 +784,8 @@ def control_run(
     manifest: RunManifest,
     body: RunControl,
 ) -> None:
-    require_operator(db, actor, run)
     action = body.action
+    require_operator(db, actor, run, original=action != "stop")
     if action == "authorize":
         if state.state not in {"prepared", "paused", "intervention"}:
             raise HTTPException(409, "Pause before replacing a run authorization context")
@@ -694,8 +808,34 @@ def control_run(
         }:
             raise HTTPException(409, "This run has already ended")
         state.stop_requested = True
-        state.state = "stopping" if state.active else "stopped"
-        if state.active:
+        steps = list(
+            db.scalars(
+                select(RunStep).where(RunStep.run_id == run.id, RunStep.phase == state.phase)
+            )
+        )
+        pending = False
+        for step in steps:
+            if step.state != "in_flight":
+                continue
+            if step.lease_until and step.lease_until > now():
+                pending = True
+            else:
+                step.state, step.reason = (
+                    "unknown",
+                    "No confirmed outcome after an accepted attempt",
+                )
+                record_event(
+                    db,
+                    run,
+                    "operation.unknown",
+                    {"reason": step.reason, "phase": state.phase, "attempt_id": step.attempt_id},
+                    step.step_id,
+                )
+        incomplete = any(step.state == "unknown" for step in steps)
+        state.active = pending
+        state.state = "stopping" if pending else ("stopped_incomplete" if incomplete else "stopped")
+        state.reason = "Unconfirmed effects remain; stop did not undo them." if incomplete else None
+        if pending:
             notify_dispatch(db, run, state)
     elif action == "recover":
         if (
@@ -834,7 +974,7 @@ def manual_recovery(
     state: ExerciseRunState,
     body: ManualRecoveryInput,
 ) -> None:
-    require_operator(db, actor, run)
+    require_operator(db, actor, run, original=False)
     step = db.get(RunStep, (run.id, body.phase, str(body.step_id)))
     stopped_unknown = (
         body.phase == "exercise"

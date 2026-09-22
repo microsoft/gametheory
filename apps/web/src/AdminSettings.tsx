@@ -24,7 +24,7 @@ function draftOf(policy: Policy): PolicyInput {
 export function AdminSettings() {
   const { api } = useSession()
   const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') })
-  if (me.isPending || me.error)
+  if (me.isPending || (me.error && !me.data))
     return (
       <main className="page">
         <h1>Settings</h1>
@@ -32,7 +32,7 @@ export function AdminSettings() {
         {me.isPending && <p role="status">Checking administrator access...</p>}
       </main>
     )
-  if (!me.data.organization_admin)
+  if (!me.data?.organization_admin)
     return (
       <main className="page">
         <h1>Settings</h1>
@@ -43,10 +43,10 @@ export function AdminSettings() {
         <Link to="/">Back to workspaces</Link>
       </main>
     )
-  return <AdminSettingsContent />
+  return <AdminSettingsContent permissionError={me.error} />
 }
 
-export function AdminSettingsContent() {
+export function AdminSettingsContent({ permissionError }: { permissionError?: unknown }) {
   const { api } = useSession()
   const cache = useQueryClient()
   const [section, setSection] = useState<'environments' | 'access' | 'runtime'>('environments')
@@ -54,6 +54,7 @@ export function AdminSettingsContent() {
   const [name, setName] = useState('')
   const [workspace, setWorkspace] = useState('')
   const [dirty, setDirty] = useState(false)
+  const [localInput, setLocalInput] = useState<unknown>()
   function leaveInput() {
     return (
       !dirty ||
@@ -68,6 +69,7 @@ export function AdminSettingsContent() {
   }
   const policies = useQuery({
     queryKey: ['environment-policies'],
+    enabled: !permissionError,
     queryFn: () => api.get<Policy[]>('/admin/environment-policies'),
   })
   const workspaces = useQuery({
@@ -79,7 +81,11 @@ export function AdminSettingsContent() {
     queryFn: () => api.get<Schemas['RuntimeStatus']>('/admin/runtime'),
   })
   const create = useMutation({
-    mutationFn: () => api.send<{ id: string }>('/environments', 'POST', { name: name.trim() }),
+    mutationFn: () => {
+      if (permissionError)
+        throw new Error('Administrator access must be confirmed before creating an environment.')
+      return api.send<{ id: string }>('/environments', 'POST', { name: name.trim() })
+    },
     onSuccess: async (value) => {
       setName('')
       setSelected(value.id)
@@ -95,6 +101,7 @@ export function AdminSettingsContent() {
       <Link className="breadcrumb" to="/">
         Workspaces
       </Link>
+      <ErrorNotice error={permissionError} />
       <div className="page-heading">
         <div>
           <h1>
@@ -175,13 +182,19 @@ export function AdminSettingsContent() {
                     onChange={(event) => setName(event.target.value)}
                   />
                 </label>
-                <button disabled={create.isPending || !name.trim()}>
+                <button disabled={create.isPending || !name.trim() || !!permissionError}>
                   {create.isPending ? 'Adding...' : 'Add environment'}
                 </button>
               </form>
             </aside>
-            {policy && !policies.error ? (
-              <PolicyEditor key={policy.environment_id} policy={policy} onDirtyChange={setDirty} />
+            {policy ? (
+              <PolicyEditor
+                key={policy.environment_id}
+                policy={policy}
+                onDirtyChange={setDirty}
+                onInputChange={setLocalInput}
+                readOnly={!!policies.error || !!permissionError}
+              />
             ) : (
               <section className="glass preparation-panel">
                 <h2>Select an environment</h2>
@@ -221,7 +234,15 @@ export function AdminSettingsContent() {
               ))}
             </select>
           </label>
-          {workspace && <RunAccess key={workspace} wid={workspace} onDirtyChange={setDirty} />}
+          {workspace && (
+            <RunAccess
+              key={workspace}
+              wid={workspace}
+              onDirtyChange={setDirty}
+              onInputChange={setLocalInput}
+              readOnly={!!permissionError}
+            />
+          )}
         </section>
       )}
       {section === 'runtime' && (
@@ -259,6 +280,15 @@ export function AdminSettingsContent() {
           )}
         </section>
       )}
+      <UnsavedChanges
+        dirty={dirty || !!name || create.isPending}
+        onExport={() =>
+          exportJson(
+            { new_environment_name: name, local_input: localInput },
+            'settings-local-input.json',
+          )
+        }
+      />
     </main>
   )
 }
@@ -266,9 +296,13 @@ export function AdminSettingsContent() {
 export function PolicyEditor({
   policy,
   onDirtyChange,
+  onInputChange,
+  readOnly = false,
 }: {
   policy: Policy
   onDirtyChange?: (dirty: boolean) => void
+  onInputChange?: (input: unknown) => void
+  readOnly?: boolean
 }) {
   const { api } = useSession()
   const cache = useQueryClient()
@@ -284,7 +318,11 @@ export function PolicyEditor({
     queryFn: () => api.get<Policy[]>(`${path}/history`),
   })
   const save = useMutation({
-    mutationFn: () => api.send<Policy>(path, 'PUT', draft, base.version),
+    mutationFn: () => {
+      if (readOnly)
+        throw new Error('Reload administrator access and the current policy before saving.')
+      return api.send<Policy>(path, 'PUT', draft, base.version)
+    },
     onSuccess: async (value) => {
       setBase(value)
       setDraft(draftOf(value))
@@ -312,12 +350,15 @@ export function PolicyEditor({
     },
   })
   const conflict =
-    policy.version !== base.version ? new ApiError(409, 'A newer policy exists.', null) : save.error
+    policy.version > base.version ? new ApiError(409, 'A newer policy exists.', null) : save.error
   const busy = save.isPending || reload.isPending
   useEffect(() => {
     onDirtyChange?.(dirty || busy)
     return () => onDirtyChange?.(false)
   }, [dirty, busy, onDirtyChange])
+  useEffect(() => {
+    onInputChange?.({ environment_id: policy.environment_id, base_version: base.version, ...draft })
+  }, [draft, base.version, policy.environment_id, onInputChange])
   const exportInput = () =>
     exportJson(
       { environment_id: policy.environment_id, base_version: base.version, ...draft },
@@ -348,7 +389,7 @@ export function PolicyEditor({
           save.mutate()
         }}
       >
-        <fieldset className="preparation-inputs" disabled={busy}>
+        <fieldset className="preparation-inputs" disabled={busy || readOnly}>
           <legend>Execution policy</legend>
           <label>
             Environment classification
@@ -408,7 +449,10 @@ export function PolicyEditor({
           )}
         </fieldset>
         <div className="toolbar">
-          <button className="primary" disabled={!dirty || busy || policy.version !== base.version}>
+          <button
+            className="primary"
+            disabled={!dirty || busy || readOnly || policy.version > base.version}
+          >
             {save.isPending ? 'Saving...' : 'Save environment policy'}
           </button>
           <button type="button" onClick={exportInput}>
@@ -445,7 +489,7 @@ export function PolicyEditor({
           </ol>
         </>
       )}
-      <UnsavedChanges dirty={dirty || busy} onExport={exportInput} />
+      {!onDirtyChange && <UnsavedChanges dirty={dirty || busy} onExport={exportInput} />}
     </section>
   )
 }
@@ -453,9 +497,13 @@ export function PolicyEditor({
 export function RunAccess({
   wid,
   onDirtyChange,
+  onInputChange,
+  readOnly = false,
 }: {
   wid: string
   onDirtyChange?: (dirty: boolean) => void
+  onInputChange?: (input: unknown) => void
+  readOnly?: boolean
 }) {
   const { api } = useSession()
   const cache = useQueryClient()
@@ -466,6 +514,7 @@ export function RunAccess({
   const grants = useQuery({ queryKey: key, queryFn: () => api.get<Grant[]>(path) })
   const change = useMutation({
     mutationFn: async (remove?: Grant) => {
+      if (readOnly) throw new Error('Confirm administrator access before changing run grants.')
       if (remove) await api.remove(`${path}/${remove.object_id}/${remove.capability}`)
       else await api.send<Grant>(path, 'PUT', { object_id: objectId.trim(), capability })
     },
@@ -481,6 +530,9 @@ export function RunAccess({
     onDirtyChange?.(!!objectId || change.isPending)
     return () => onDirtyChange?.(false)
   }, [objectId, change.isPending, onDirtyChange])
+  useEffect(() => {
+    onInputChange?.({ workspace_id: wid, object_id: objectId, capability })
+  }, [wid, objectId, capability, onInputChange])
   return (
     <section className="glass preparation-panel">
       <h3>Explicit execution capabilities</h3>
@@ -524,7 +576,11 @@ export function RunAccess({
             <option value="reviewer">Independent execution reviewer</option>
           </select>
         </label>
-        <button disabled={change.isPending || !objectId.trim() || !!grants.error || !grants.data}>
+        <button
+          disabled={
+            readOnly || change.isPending || !objectId.trim() || !!grants.error || !grants.data
+          }
+        >
           Grant execution capability
         </button>
       </form>
@@ -540,7 +596,7 @@ export function RunAccess({
               </strong>
               <code>{item.object_id}</code>
               <button
-                disabled={change.isPending}
+                disabled={change.isPending || readOnly}
                 onClick={() => {
                   if (
                     window.confirm(
@@ -555,12 +611,14 @@ export function RunAccess({
             </li>
           ))}
       </ul>
-      <UnsavedChanges
-        dirty={!!objectId || change.isPending}
-        onExport={() =>
-          exportJson({ object_id: objectId, capability }, 'execution-grant-input.json')
-        }
-      />
+      {!onDirtyChange && (
+        <UnsavedChanges
+          dirty={!!objectId || change.isPending}
+          onExport={() =>
+            exportJson({ object_id: objectId, capability }, 'execution-grant-input.json')
+          }
+        />
+      )}
     </section>
   )
 }
