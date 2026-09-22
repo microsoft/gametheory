@@ -281,10 +281,17 @@ def test_real_lab_effects_reconcile_after_commit_and_participants_remain_externa
         assert url.database == database and url.host == "127.0.0.1"
         engine = real_engine(target_url)
 
-        @event.listens_for(engine, "connect")
-        def impersonate(connection, _record):
+        @event.listens_for(engine, "checkout")
+        def impersonate(connection, _record, _proxy):
             cursor = connection.cursor()
             cursor.execute(f"EXECUTE AS USER = '{lab.sql_principal}'")
+            cursor.close()
+
+        @event.listens_for(engine, "reset")
+        def restore_principal(connection, _record, _state):
+            # ODBC pooling can outlive this SQLAlchemy engine and retain EXECUTE AS.
+            cursor = connection.cursor()
+            cursor.execute("REVERT")
             cursor.close()
 
         return engine
