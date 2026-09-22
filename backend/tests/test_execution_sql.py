@@ -305,6 +305,35 @@ def test_other_explicit_operator_can_stop_after_original_grant_is_revoked(
     assert not calls
 
 
+def test_failed_observation_cannot_become_success_after_its_deadline(
+    sql_client,
+    sql_factory,
+    monkeypatch,
+    tmp_path,
+):
+    case = execution_case(sql_client, sql_factory, monkeypatch, tmp_path, observation=True)
+    require(case.control("authorize"))
+    require(case.control("start"))
+    calls = []
+    monkeypatch.setattr(
+        worker,
+        "invoke",
+        lambda *_: calls.append(True) or AdapterResult(outcome="failed", reason="Read unavailable"),
+    )
+    did = dispatch_for(sql_factory, case.run["id"])
+    worker.advance(did)
+    with sql_factory.begin() as db:
+        row = db.scalar(select(RunStep).where(RunStep.run_id == case.run["id"]))
+        row.started_at = now() - timedelta(seconds=30)
+    require(case.control("reconcile"))
+    worker.advance(did)
+    current = require(case.client.get(case.run_path))
+    assert current["state"] == "intervention"
+    assert current["steps"][0]["state"] == "failed"
+    assert current["steps"][0]["result"] == {}
+    assert len(calls) == 1
+
+
 @pytest.mark.parametrize("automatic,conflict", [(False, False), (True, False), (True, True)])
 def test_recovery_uses_recorded_preconditions_and_manual_reports_are_not_verified_success(
     sql_client,

@@ -25,6 +25,7 @@ def execution_case(
     steps=None,
     mutation=False,
     recovery=False,
+    observation=False,
 ):
     client, actor = sql_client
     wid, workspace, _, _, board, board_path = published_board(client, "Execution integration")
@@ -169,6 +170,19 @@ def execution_case(
                 "preview_id": frozen["id"],
                 "preview_digest": frozen["digest"],
                 "recovery": recovery_bindings,
+                "observations": [
+                    {
+                        "step_id": draft["steps"][0]["id"],
+                        "field": "quantity",
+                        "operator": "gt",
+                        "value": 99,
+                        "interval_seconds": 1,
+                        "timeout_seconds": 10,
+                        "max_samples": 3,
+                    }
+                ]
+                if observation
+                else [],
             },
         ),
         201,

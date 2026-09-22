@@ -383,6 +383,19 @@ def advance(dispatch_id: str) -> Tick:
                 or current >= row.started_at + timedelta(seconds=observation.timeout_seconds)
             )
         ):
+            if row.state != "waiting":
+                row.state = "failed"
+                row.reason = "Observation budget ended without a successful final sample; evidence remains incomplete."
+                state.state, state.reason = "intervention", row.reason
+                state.version += 1
+                record_event(
+                    db,
+                    run,
+                    "observation.incomplete",
+                    {"phase": state.phase, "reason": row.reason},
+                    sid,
+                )
+                return tick(30)
             row.state, row.finished_at = "succeeded", current
             row.reason = "Observation budget ended without a matching sample; missing coverage is not participant failure."
             record_event(
