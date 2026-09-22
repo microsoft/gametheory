@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, true
 from sqlalchemy.orm import Session, sessionmaker
 
 from flood_lab.auth import Actor
@@ -113,7 +113,7 @@ class LabService:
                     RunGrant.tenant_id == actor.tenant_id,
                     RunGrant.object_id == actor.object_id,
                     RunGrant.principal_kind == actor.kind,
-                    RunGrant.active.is_(True),
+                    RunGrant.active == true(),
                     RunGrant.expires_at > utc_now(session),
                 )
                 .order_by(Run.created_at, Run.id)

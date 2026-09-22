@@ -171,6 +171,8 @@ def test_actor_roles_run_and_record_relationships_are_enforced(sql_lab):
 
 def test_grant_revocation_prevents_read_and_replay(sql_lab):
     lab = sql_lab
+    visible = lab.service.list_runs(lab.participant, 50, 0)
+    assert [run.run_id for run in visible.items] == [lab.run_id]
     body = ack_body(lab)
     lab.service.acknowledge(lab.participant, lab.run_id, lab.request_id, body, uuid4())
     lab.operator.grant(
