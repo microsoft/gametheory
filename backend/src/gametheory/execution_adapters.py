@@ -184,7 +184,7 @@ def rest_request(
         raise ValueError("REST invocation required")
     remaining = dict(parameters)
     path = invocation.path
-    for name in re.findall(r"\{([^}]+)\}", path):
+    for name in dict.fromkeys(re.findall(r"\{([^}]+)\}", path)):
         value = str(remaining.pop(name))
         if value in {".", ".."} or "/" in value or "\\" in value or "%" in value:
             raise ValueError("Path values cannot alter route structure")

@@ -303,6 +303,14 @@ def test_rest_headers_and_encoded_paths_are_dispatcher_owned():
             adapters.rest_request(operation, {"record_id": malicious}, "key")
     with pytest.raises(ValueError):
         adapters.rest_request(operation, {"record_id": "id", "expected_version": '"quoted"'}, "key")
+    repeated = operation.model_dump()
+    repeated["invocation"]["path"] = "/records/{record_id}/references/{record_id}"
+    assert (
+        adapters.rest_request(
+            OperationDefinition.model_validate(repeated), {"record_id": "safe id"}, "key"
+        )[0]
+        == "/records/safe%20id/references/safe%20id"
+    )
 
 
 @pytest.mark.parametrize("value", ["20", True, float("nan"), float("inf")])
