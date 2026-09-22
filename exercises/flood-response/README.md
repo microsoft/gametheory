@@ -54,6 +54,24 @@ instead. The source checkout (including `migrations/`) is the supported CLI
 distribution; the independent Dockerfile carries those same files. Do not
 install this package into Game Theory's environment.
 
+### Updating dependency locks
+
+Use uv's universal Python 3.12 resolver to regenerate both lab-only locks from
+this directory. The development lock is constrained by the runtime lock so
+their shared dependencies stay aligned:
+
+```bash
+uv pip compile --universal --python-version 3.12 --generate-hashes \
+  requirements.in -o requirements.lock
+uv pip compile --universal --python-version 3.12 --generate-hashes \
+  -c requirements.lock requirements.in requirements-dev.in -o requirements-dev.lock
+```
+
+Keep `--universal`: host-only resolution on macOS arm64 omits SQLAlchemy's
+conditional `greenlet` dependency needed on Linux x64. Both locks must retain
+platform markers, exact pins and distribution hashes; installs continue to use
+`--require-hashes`. The existing pins are preserved unless explicitly upgraded.
+
 ## Dedicated local SQL target
 
 On an approved **Linux x86-64** host, choose a new local-only admin secret and
