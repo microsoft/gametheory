@@ -19,6 +19,7 @@ import {
   type Preview,
 } from './preparation'
 import type { Connection } from './types'
+import { BoardRuns } from './ExerciseRuns'
 
 export function PreparationBoard() {
   const { wid = '', bid = '' } = useParams()
@@ -26,13 +27,13 @@ export function PreparationBoard() {
 }
 
 export function PreparationBoardContent({ wid, bid }: { wid: string; bid: string }) {
-  const { api } = useSession()
+  const { api, config: appConfig } = useSession()
   const cache = useQueryClient()
   const path = `/workspaces/${wid}/boards/${bid}`
   const key = [wid, 'board', bid]
   const [base, setBase] = useState<BoardView>()
   const [draft, setDraft] = useState<BoardDraft>()
-  const [pane, setPane] = useState<'draft' | 'preview' | 'history'>('draft')
+  const [pane, setPane] = useState<'draft' | 'preview' | 'history' | 'runs'>('draft')
   const [selectedPreviewId, setSelectedPreviewId] = useState('')
   const [decision, setDecision] = useState<Approval['decision'] | ''>('')
   const [expires, setExpires] = useState('')
@@ -339,7 +340,7 @@ export function PreparationBoardContent({ wid, bid }: { wid: string; bid: string
           </button>
         </div>
       </div>
-      <ExecutionBoundary />
+      <ExecutionBoundary executionAvailable={appConfig.capabilities.execution} />
       <ErrorNotice error={error} />
       <ConflictNotice
         error={conflict}
@@ -390,9 +391,21 @@ export function PreparationBoardContent({ wid, bid }: { wid: string; bid: string
         <button type="button" aria-current={pane === 'history'} onClick={() => setPane('history')}>
           History
         </button>
+        <button type="button" aria-current={pane === 'runs'} onClick={() => setPane('runs')}>
+          Exercise runs
+        </button>
       </nav>
       <div className="preparation-layout">
         <div className="stack">
+          {pane === 'runs' && (
+            <BoardRuns
+              wid={wid}
+              bid={bid}
+              version={base.version}
+              preview={selectedPreview}
+              unsaved={dirty || behind}
+            />
+          )}
           {pane === 'draft' && (
             <>
               <ErrorNotice error={configurationError} />

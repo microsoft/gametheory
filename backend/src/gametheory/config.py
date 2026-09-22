@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     foundry_project_endpoint: str = ""
     model_deployment: str = ""
     planning_enabled: bool = False
+    execution_enabled: bool = False
+    execution_taskhub: str = "gametheory-exercises"
+    execution_bindings_file: str = ""
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1024, le=100 * 1024 * 1024)
     model_timeout_seconds: int = Field(default=120, ge=10, le=600)
     planner_max_output_tokens: int = Field(default=6000, ge=256, le=16000)
@@ -105,6 +108,22 @@ class Settings(BaseSettings):
                     raise ValueError("Unauthenticated scheduler is limited to the local emulator")
             elif endpoint.scheme != "https":
                 raise ValueError("Managed scheduler must use HTTPS")
+        if self.execution_enabled:
+            if self.cloud != "commercial" or not profile.scheduler_supported:
+                raise ValueError("Exercise execution requires the commercial Scheduler runtime")
+            if not all(
+                [
+                    self.sql_url,
+                    self.tenant_id,
+                    self.scheduler_endpoint,
+                    self.execution_bindings_file,
+                ]
+            ):
+                raise ValueError(
+                    "Execution requires SQL, tenant, Scheduler, and operator target bindings"
+                )
+            if not self.execution_taskhub or self.execution_taskhub == self.scheduler_taskhub:
+                raise ValueError("Execution requires a separate task hub from planning")
         return self
 
     @property

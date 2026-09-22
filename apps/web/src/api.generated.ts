@@ -479,6 +479,213 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/runtime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Runtime */
+        get: operations["runtime_api_admin_runtime_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/environment-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Policies */
+        get: operations["policies_api_admin_environment_policies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/environment-policies/{eid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Policy */
+        get: operations["policy_api_admin_environment_policies__eid__get"];
+        /** Update Policy */
+        put: operations["update_policy_api_admin_environment_policies__eid__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/environment-policies/{eid}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Policy History */
+        get: operations["policy_history_api_admin_environment_policies__eid__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{wid}/execution-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Grants */
+        get: operations["grants_api_workspaces__wid__execution_grants_get"];
+        /** Grant */
+        put: operations["grant_api_workspaces__wid__execution_grants_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{wid}/execution-grants/{oid}/{capability}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Grant */
+        delete: operations["revoke_grant_api_workspaces__wid__execution_grants__oid___capability__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{wid}/boards/{bid}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Runs */
+        get: operations["runs_api_workspaces__wid__boards__bid__runs_get"];
+        put?: never;
+        /** Create Run */
+        post: operations["create_run_api_workspaces__wid__boards__bid__runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{wid}/runs/{rid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Run */
+        get: operations["run_api_workspaces__wid__runs__rid__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{wid}/runs/{rid}/controls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Control */
+        post: operations["control_api_workspaces__wid__runs__rid__controls_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{wid}/runs/{rid}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve */
+        post: operations["approve_api_workspaces__wid__runs__rid__approvals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{wid}/runs/{rid}/approvals/{aid}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke Approval */
+        post: operations["revoke_approval_api_workspaces__wid__runs__rid__approvals__aid__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/workspaces/{wid}/runs/{rid}/manual-recovery-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Manual Report */
+        post: operations["manual_report_api_workspaces__wid__runs__rid__manual_recovery_reports_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -891,6 +1098,58 @@ export interface components {
              */
             description: string;
         };
+        /** EnvironmentPolicyInput */
+        EnvironmentPolicyInput: {
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "unknown" | "nonproduction" | "production";
+            /**
+             * Execution Enabled
+             * @default false
+             */
+            execution_enabled: boolean;
+            /**
+             * Approval Required
+             * @default false
+             */
+            approval_required: boolean;
+        };
+        /** EnvironmentPolicyView */
+        EnvironmentPolicyView: {
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "unknown" | "nonproduction" | "production";
+            /**
+             * Execution Enabled
+             * @default false
+             */
+            execution_enabled: boolean;
+            /**
+             * Approval Required
+             * @default false
+             */
+            approval_required: boolean;
+            /**
+             * Environment Id
+             * Format: uuid
+             */
+            environment_id: string;
+            /** Name */
+            name: string;
+            /** Version */
+            version: number;
+            /**
+             * Updated By
+             * Format: uuid
+             */
+            updated_by: string;
+            /** Updated At */
+            updated_at: string;
+        };
         /** ExecutionDisabled */
         ExecutionDisabled: {
             /**
@@ -910,6 +1169,49 @@ export interface components {
              * @constant
              */
             execution_authorized: false;
+        };
+        /** ExecutionGrantInput */
+        ExecutionGrantInput: {
+            /**
+             * Object Id
+             * Format: uuid
+             */
+            object_id: string;
+            /**
+             * Capability
+             * @enum {string}
+             */
+            capability: "operator" | "reviewer";
+        };
+        /** ExecutionGrantView */
+        ExecutionGrantView: {
+            /**
+             * Object Id
+             * Format: uuid
+             */
+            object_id: string;
+            /**
+             * Capability
+             * @enum {string}
+             */
+            capability: "operator" | "reviewer";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Workspace Id
+             * Format: uuid
+             */
+            workspace_id: string;
+            /**
+             * Granted By
+             * Format: uuid
+             */
+            granted_by: string;
+            /** Granted At */
+            granted_at: string;
         };
         /** FlowEdge */
         FlowEdge: {
@@ -975,6 +1277,24 @@ export interface components {
             detail?: components["schemas"]["ValidationError"][];
         };
         JsonValue: unknown;
+        /** ManualRecoveryInput */
+        ManualRecoveryInput: {
+            /**
+             * Step Id
+             * Format: uuid
+             */
+            step_id: string;
+            /**
+             * Phase
+             * @default recovery
+             * @enum {string}
+             */
+            phase: "exercise" | "recovery";
+            /** Evidence Reference */
+            evidence_reference: string;
+            /** Note */
+            note: string;
+        };
         /** MeView */
         MeView: {
             /** Object Id */
@@ -1028,6 +1348,85 @@ export interface components {
             title: string;
             /** Criterion */
             criterion: string;
+        };
+        /** ObjectiveFinding */
+        ObjectiveFinding: {
+            /**
+             * Objective Id
+             * Format: uuid
+             */
+            objective_id: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "met" | "unmet" | "indeterminate";
+            /** Reason */
+            reason: string;
+            /** Evidence Ids */
+            evidence_ids: string[];
+        };
+        /** ObjectiveRule */
+        ObjectiveRule: {
+            /**
+             * Objective Id
+             * Format: uuid
+             */
+            objective_id: string;
+            /**
+             * Step Id
+             * Format: uuid
+             */
+            step_id: string;
+            /** Field */
+            field: string;
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: "eq" | "ne" | "gt" | "gte" | "lt" | "lte";
+            /** Value */
+            value: string | number | boolean | components["schemas"]["PriorResultReference"];
+            /** Anchor Step Id */
+            anchor_step_id?: string | null;
+            /** Anchor Field */
+            anchor_field?: string | null;
+            /** Within Seconds */
+            within_seconds?: number | null;
+            /** Source Time Field */
+            source_time_field?: string | null;
+        };
+        /** Observation */
+        Observation: {
+            /**
+             * Step Id
+             * Format: uuid
+             */
+            step_id: string;
+            /** Field */
+            field: string;
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: "eq" | "ne" | "gt" | "gte" | "lt" | "lte";
+            /** Value */
+            value: string | number | boolean;
+            /**
+             * Interval Seconds
+             * @default 10
+             */
+            interval_seconds: number;
+            /**
+             * Timeout Seconds
+             * @default 600
+             */
+            timeout_seconds: number;
+            /**
+             * Max Samples
+             * @default 100
+             */
+            max_samples: number;
         };
         /** OperationBinding */
         OperationBinding: {
@@ -1368,6 +1767,23 @@ export interface components {
             /** Field */
             field: string;
         };
+        /** RecoveryBinding */
+        RecoveryBinding: {
+            /**
+             * Step Id
+             * Format: uuid
+             */
+            step_id: string;
+            binding: components["schemas"]["OperationBinding"];
+            /** Parameters */
+            parameters: {
+                [key: string]: string | number | boolean | components["schemas"]["PriorResultReference"];
+            };
+            /** Ownership Parameter */
+            ownership_parameter: string;
+            /** Version Parameter */
+            version_parameter: string;
+        };
         /**
          * RestInvocation
          * @description Description only: expected_version maps to future strong If-Match.
@@ -1389,6 +1805,232 @@ export interface components {
             method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
             /** Path */
             path: string;
+        };
+        /** RunApprovalInput */
+        RunApprovalInput: {
+            /**
+             * Context Id
+             * Format: uuid
+             */
+            context_id: string;
+            /** Manifest Digest */
+            manifest_digest: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected";
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Note */
+            note: string;
+        };
+        /** RunControl */
+        RunControl: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "authorize" | "start" | "pause" | "resume" | "stop" | "reconcile" | "recover";
+            /** Note */
+            note: string;
+        };
+        /** RunCreate */
+        RunCreate: {
+            /**
+             * Preview Id
+             * Format: uuid
+             */
+            preview_id: string;
+            /** Preview Digest */
+            preview_digest: string;
+            /**
+             * Trigger
+             * @default manual
+             * @enum {string}
+             */
+            trigger: "manual" | "scheduled";
+            /** Observations */
+            observations?: components["schemas"]["Observation"][];
+            /** Objectives */
+            objectives?: components["schemas"]["ObjectiveRule"][];
+            /** Recovery */
+            recovery?: components["schemas"]["RecoveryBinding"][];
+        };
+        /** RunEventView */
+        RunEventView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Step Id */
+            step_id: string | null;
+            /** Created At */
+            created_at: string;
+            /** Detail */
+            detail: {
+                [key: string]: string | number | boolean | null;
+            };
+        };
+        /** RunManifest */
+        RunManifest: {
+            /**
+             * Schema Version
+             * @default exercise-execution/v2
+             * @constant
+             */
+            schema_version: "exercise-execution/v2";
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            preparation: components["schemas"]["PreparationManifest"];
+            /**
+             * Trigger
+             * @enum {string}
+             */
+            trigger: "manual" | "scheduled";
+            /** Observations */
+            observations: components["schemas"]["Observation"][];
+            /** Objectives */
+            objectives: components["schemas"]["ObjectiveRule"][];
+            /** Recovery */
+            recovery: components["schemas"]["RecoveryBinding"][];
+            /**
+             * Sql Idempotency
+             * @default dispatcher-owned/v1
+             * @constant
+             */
+            sql_idempotency: "dispatcher-owned/v1";
+            /**
+             * Max Operations
+             * @default 1000
+             */
+            max_operations: number;
+        };
+        /** RunStepView */
+        RunStepView: {
+            /** Step Id */
+            step_id: string;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "exercise" | "recovery";
+            /** State */
+            state: string;
+            /** Result */
+            result: {
+                [key: string]: string | number | boolean | null;
+            };
+            /** Reason */
+            reason: string | null;
+            /** Samples */
+            samples: number;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+        };
+        /** RunSummary */
+        RunSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Board Id
+             * Format: uuid
+             */
+            board_id: string;
+            /** State */
+            state: string;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "exercise" | "recovery";
+            /**
+             * Operator
+             * Format: uuid
+             */
+            operator: string;
+            /** Created At */
+            created_at: string;
+        };
+        /** RunView */
+        RunView: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Board Id
+             * Format: uuid
+             */
+            board_id: string;
+            /** Version */
+            version: number;
+            /** State */
+            state: string;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "exercise" | "recovery";
+            /**
+             * Operator
+             * Format: uuid
+             */
+            operator: string;
+            /** Created At */
+            created_at: string;
+            /** Manifest Digest */
+            manifest_digest: string;
+            manifest: components["schemas"]["RunManifest"];
+            /** Context Id */
+            context_id: string | null;
+            /** Approval Required */
+            approval_required: boolean;
+            /**
+             * Approval Status
+             * @enum {string}
+             */
+            approval_status: "not_required" | "required" | "approved" | "rejected" | "invalid";
+            /** Blockers */
+            blockers: string[];
+            /** Can Operate */
+            can_operate: boolean;
+            /** Can Review */
+            can_review: boolean;
+            /** Steps */
+            steps: components["schemas"]["RunStepView"][];
+            /** Events */
+            events: components["schemas"]["RunEventView"][];
+            /** Findings */
+            findings: components["schemas"]["ObjectiveFinding"][];
+        };
+        /** RuntimeStatus */
+        RuntimeStatus: {
+            /** Execution Enabled */
+            execution_enabled: boolean;
+            /** Sql Configured */
+            sql_configured: boolean;
+            /** Scheduler Configured */
+            scheduler_configured: boolean;
+            /** Target Bindings Configured */
+            target_bindings_configured: boolean;
+            /** Message */
+            message: string;
         };
         /** ScenarioContent */
         ScenarioContent: {
@@ -2929,6 +3571,507 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExecutionDisabled"];
+                };
+            };
+        };
+    };
+    runtime_api_admin_runtime_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeStatus"];
+                };
+            };
+        };
+    };
+    policies_api_admin_environment_policies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentPolicyView"][];
+                };
+            };
+        };
+    };
+    policy_api_admin_environment_policies__eid__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description Strong numeric resource version for If-Match. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentPolicyView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_policy_api_admin_environment_policies__eid__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
+            path: {
+                eid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnvironmentPolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description Strong numeric resource version for If-Match. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentPolicyView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    policy_history_api_admin_environment_policies__eid__history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                eid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvironmentPolicyView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grants_api_workspaces__wid__execution_grants_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecutionGrantView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grant_api_workspaces__wid__execution_grants_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExecutionGrantInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExecutionGrantView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_grant_api_workspaces__wid__execution_grants__oid___capability__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wid: string;
+                oid: string;
+                capability: "operator" | "reviewer";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    runs_api_workspaces__wid__boards__bid__runs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wid: string;
+                bid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_run_api_workspaces__wid__boards__bid__runs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
+            path: {
+                wid: string;
+                bid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    /** @description Strong numeric resource version for If-Match. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_api_workspaces__wid__runs__rid__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wid: string;
+                rid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description Strong numeric resource version for If-Match. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    control_api_workspaces__wid__runs__rid__controls_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
+            path: {
+                wid: string;
+                rid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunControl"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description Strong numeric resource version for If-Match. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_api_workspaces__wid__runs__rid__approvals_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
+            path: {
+                wid: string;
+                rid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunApprovalInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description Strong numeric resource version for If-Match. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_approval_api_workspaces__wid__runs__rid__approvals__aid__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
+            path: {
+                wid: string;
+                rid: string;
+                aid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    /** @description Strong numeric resource version for If-Match. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    manual_report_api_workspaces__wid__runs__rid__manual_recovery_reports_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
+            path: {
+                wid: string;
+                rid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualRecoveryInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

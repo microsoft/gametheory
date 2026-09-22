@@ -11,7 +11,8 @@ export default defineConfig(({ mode }) => ({
             configureServer(server: import('vite').ViteDevServer) {
               server.middlewares.use((request, _response, next) => {
                 const path = new URL(request.url ?? '/', 'http://fixture.local').pathname
-                if (path === '/' || path.startsWith('/w/')) request.url = '/test.html'
+                if (path === '/' || path === '/settings' || path.startsWith('/w/'))
+                  request.url = '/test.html'
                 next()
               })
             },

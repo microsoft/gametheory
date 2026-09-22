@@ -56,6 +56,7 @@ jobs:
         run: |
           gametheory openapi
           gametheory preparation-schemas
+          gametheory execution-schemas
           gametheory operation-catalog-schema
           npm run contracts
           git diff --exit-code -- backend/openapi.json backend/contracts backend/operation-catalog.schema.json apps/web/src/api.generated.ts
@@ -68,8 +69,10 @@ jobs:
         run: |
           docker build --target api -t gametheory-api:ci .
           docker build --target worker -t gametheory-worker:ci .
+          docker build --target executor -t gametheory-executor:ci .
           docker build --target validation -t gametheory-validation:ci .
           docker run --rm gametheory-api:ci python -c "import pathlib; assert not pathlib.Path('/app/exercises').exists(), 'External exercise code must not be bundled'"
+          docker run --rm gametheory-executor:ci python -c "import pathlib; assert not pathlib.Path('/app/exercises').exists(), 'Executor must not bundle external exercise code'"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -139,3 +142,65 @@ jobs:
           path: |
             exercises/flood-response/ui/test-results/
             exercises/flood-response/ui/playwright-report/
+  execution:
+    runs-on: ubuntu-24.04
+    services:
+      sql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: Ephemeral-${{ github.run_id }}-${{ github.run_attempt }}-Execution!
+        ports:
+          - 1433:1433
+      scheduler:
+        image: mcr.microsoft.com/dts/dts-emulator:latest
+        ports:
+          - 8080:8080
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements-dev.lock
+            exercises/flood-response/requirements-dev.lock
+      - name: Install ODBC Driver 18
+        run: |
+          curl -fsSL "https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb" -o /tmp/msprod.deb
+          sudo dpkg -i /tmp/msprod.deb && sudo apt-get update -qq
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+      - name: Install isolated product and lab environments
+        run: |
+          python -m venv backend/.venv
+          backend/.venv/bin/pip install --require-hashes -r backend/requirements-dev.lock
+          backend/.venv/bin/pip install --no-deps -e backend
+          backend/.venv/bin/pip check
+          python -m venv exercises/flood-response/.venv
+          exercises/flood-response/.venv/bin/pip install --require-hashes -r exercises/flood-response/requirements-dev.lock
+      - name: Create separate disposable databases
+        env:
+          TEST_SQL_PASSWORD: Ephemeral-${{ github.run_id }}-${{ github.run_attempt }}-Execution!
+        run: |
+          backend/.venv/bin/python scripts/prepare-test-sql.py --database-name gametheory_test_execution
+          backend/.venv/bin/python scripts/prepare-test-sql.py --database-name flood_lab_test_execution
+      - name: Real SQL, isolated HTTPS lab, and durable execution restart
+        env:
+          GT_TEST_SQL_URL: mssql+pyodbc://sa:Ephemeral-${{ github.run_id }}-${{ github.run_attempt }}-Execution!@127.0.0.1:1433/gametheory_test_execution?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=yes
+          FLOOD_LAB_TEST_DATABASE_NAME: flood_lab_test_execution
+          FLOOD_LAB_TEST_DATABASE_URL: mssql+pyodbc://sa:Ephemeral-${{ github.run_id }}-${{ github.run_attempt }}-Execution!@127.0.0.1:1433/flood_lab_test_execution?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=yes
+          FLOOD_LAB_TEST_ALLOW_RESET: 'yes'
+          GT_TEST_EXECUTION_LAB: 'true'
+          GT_TEST_EXECUTION_SCHEDULER_ENDPOINT: http://127.0.0.1:8080
+        run: |
+          backend/.venv/bin/pytest -q --basetemp=.test-execution \
+            backend/tests/test_environment_policy.py backend/tests/test_execution.py \
+            backend/tests/test_execution_sql.py backend/tests/test_execution_lab.py \
+            backend/tests/test_execution_scheduler.py
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: execution-diagnostic-logs
+          path: |
+            .test-execution/**/lab-fixture.log
+            .test-execution/**/execution-worker.log

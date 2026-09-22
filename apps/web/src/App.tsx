@@ -4,10 +4,24 @@ import { MsalProvider, useMsal } from '@azure/msal-react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, Route, Routes } from 'react-router-dom'
 import { Moon, Sun, LogOut } from 'lucide-react'
-import { createApi, ErrorNotice, SessionContext } from './api'
+import { createApi, ErrorNotice, SessionContext, useSession } from './api'
 import type { Config } from './types'
 import { Library, WorkspacePage } from './Library'
 import { Studio } from './Studio'
+import type { Me } from './preparation'
+
+const AdminSettings = lazy(() =>
+  import('./AdminSettings').then((module) => ({ default: module.AdminSettings })),
+)
+const ExerciseRun = lazy(() =>
+  import('./ExerciseRuns').then((module) => ({ default: module.ExerciseRun })),
+)
+
+function AdminSettingsLink() {
+  const { api } = useSession()
+  const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') })
+  return me.data?.organization_admin && !me.error ? <Link to="/settings">Settings</Link> : null
+}
 
 const PreparationBoard = lazy(() =>
   import('./PreparationBoard').then((module) => ({ default: module.PreparationBoard })),
@@ -176,6 +190,7 @@ function Authenticated({ config }: { config: Config }) {
             Scenario studio <span className="pill">{config.cloud}</span>
           </span>
           <div className="header-actions">
+            <AdminSettingsLink />
             <span className="account-name">{accounts[0].name}</span>
             <ThemeButton />
             <button
@@ -195,6 +210,34 @@ function Authenticated({ config }: { config: Config }) {
         )}
         <Routes>
           <Route path="/" element={<Library />} />
+          <Route
+            path="/settings"
+            element={
+              <Suspense
+                fallback={
+                  <main className="page" role="status">
+                    Opening settings...
+                  </main>
+                }
+              >
+                <AdminSettings />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/w/:wid/runs/:rid"
+            element={
+              <Suspense
+                fallback={
+                  <main className="page" role="status">
+                    Opening exercise run...
+                  </main>
+                }
+              >
+                <ExerciseRun />
+              </Suspense>
+            }
+          />
           <Route path="/w/:wid" element={<WorkspacePage />} />
           <Route path="/w/:wid/s/:sid" element={<Studio />} />
           <Route

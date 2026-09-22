@@ -9,6 +9,23 @@ API_PERMISSIONS = {
     "workspaces": "SELECT, INSERT",
     "memberships": "SELECT, INSERT, UPDATE, DELETE",
     "environments": "SELECT, INSERT",
+    "environment_policies": "SELECT, INSERT",
+    "target_readiness": "SELECT",
+    "exercise_run_states": "SELECT, INSERT, UPDATE",
+    "run_steps": "SELECT, INSERT, UPDATE",
+    "run_dispatches": "SELECT, INSERT, UPDATE",
+    **{
+        table: "SELECT, INSERT"
+        for table in (
+            "execution_grants",
+            "execution_grant_revocations",
+            "exercise_runs",
+            "run_authorizations",
+            "run_approvals",
+            "run_approval_revocations",
+            "run_events",
+        )
+    },
     "connections": "SELECT, INSERT",
     "connection_grants": "SELECT, INSERT",
     "scenarios": "SELECT, INSERT, UPDATE",
@@ -54,14 +71,58 @@ WORKER_PERMISSIONS = {
     "audit": "INSERT",
 }
 
+EXECUTOR_PERMISSIONS = {
+    **{
+        table: "SELECT"
+        for table in (
+            "organizations",
+            "administrators",
+            "workspaces",
+            "memberships",
+            "environments",
+            "environment_policies",
+            "connections",
+            "connection_grants",
+            "connection_configurations",
+            "configuration_withdrawals",
+            "assets",
+            "board_origins",
+            "board_contributors",
+            "execution_grants",
+            "execution_grant_revocations",
+            "exercise_runs",
+            "run_authorizations",
+            "run_approvals",
+            "run_approval_revocations",
+            "target_readiness",
+        )
+    },
+    "exercise_run_states": "SELECT, UPDATE",
+    "run_steps": "SELECT, UPDATE",
+    "run_dispatches": "SELECT, UPDATE",
+    "run_events": "SELECT, INSERT",
+    "audit": "INSERT",
+}
 
-def provision_runtime_users(db: Session, api_client_id: UUID, worker_client_id: UUID) -> None:
-    if api_client_id == worker_client_id:
-        raise ValueError("API and worker must have separate identities")
-    for name, client_id, permissions in (
+
+def provision_runtime_users(
+    db: Session,
+    api_client_id: UUID,
+    worker_client_id: UUID,
+    executor_client_id: UUID | None = None,
+) -> None:
+    identities = [api_client_id, worker_client_id] + (
+        [executor_client_id] if executor_client_id else []
+    )
+    if len(set(identities)) != len(identities):
+        raise ValueError("API, planning worker, and executor must have separate identities")
+    users = [
         ("gametheory_api", api_client_id, API_PERMISSIONS),
         ("gametheory_worker", worker_client_id, WORKER_PERMISSIONS),
-    ):
+    ]
+    if executor_client_id:
+        users.append(("gametheory_executor", executor_client_id, EXECUTOR_PERMISSIONS))
+    for name, client_id, permissions in users:
         existing = db.execute(
             text("SELECT sid, type FROM sys.database_principals WHERE name = :name"),
             {"name": name},

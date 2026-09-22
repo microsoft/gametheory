@@ -30,6 +30,8 @@ from gametheory.domain import (
     WorkspaceView,
     mermaid,
 )
+from gametheory.execution_api import router as execution_router
+from gametheory.execution_service import revoke_execution_access
 from gametheory.logging import configure_logging
 from gametheory.persistence import (
     Asset,
@@ -38,6 +40,7 @@ from gametheory.persistence import (
     ConnectionGrant,
     DispatchIntent,
     Environment,
+    EnvironmentPolicyRecord,
     Membership,
     PlanningRequest,
     Revision,
@@ -58,6 +61,7 @@ from gametheory.service import (
     scenario_view,
     validate_references,
 )
+from gametheory.settings_api import router as settings_router
 
 logger = logging.getLogger(__name__)
 configure_logging()
@@ -142,7 +146,7 @@ def config() -> dict[str, object]:
             "authoring": bool(settings.sql_url),
             "assets": bool(settings.blob_url or settings.blob_connection_string),
             "planning": settings.planning_enabled,
-            "execution": False,
+            "execution": settings.execution_enabled,
         },
         "max_upload_bytes": settings.max_upload_bytes,
     }
@@ -218,6 +222,7 @@ def remove_member(wid: str, oid: str, actor: Actor, db: DB, request: Request) ->
     if member is None:
         raise HTTPException(404, "Membership not found")
     revoke_reviewer_access(db, actor, wid, oid, request.state.correlation)
+    revoke_execution_access(db, actor, wid, oid)
     db.delete(member)
     audit(db, actor, "membership.removed", oid, wid, correlation=request.state.correlation)
 
@@ -240,6 +245,16 @@ def create_environment(body: Named, actor: Actor, db: DB, request: Request) -> d
     env = Environment(organization_id=actor.tenant, name=body.name.strip())
     db.add(env)
     db.flush()
+    db.add(
+        EnvironmentPolicyRecord(
+            environment_id=env.id,
+            version=1,
+            classification="unknown",
+            execution_enabled=False,
+            approval_required=True,
+            actor=actor.object_id,
+        )
+    )
     audit(db, actor, "environment.created", env.id, correlation=request.state.correlation)
     return {"id": env.id, "name": env.name}
 
@@ -709,6 +724,8 @@ def decide_proposal(
 
 
 app.include_router(preparation_router)
+app.include_router(settings_router)
+app.include_router(execution_router)
 
 dist = Path(get_settings().web_dist)
 if (dist / "assets").is_dir():

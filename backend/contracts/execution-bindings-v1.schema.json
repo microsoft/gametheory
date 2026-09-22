@@ -1,0 +1,127 @@
+{
+  "$defs": {
+    "AllowedOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Digest",
+          "type": "string"
+        },
+        "safe_replay": {
+          "default": false,
+          "title": "Safe Replay",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "digest"
+      ],
+      "title": "AllowedOperation",
+      "type": "object"
+    },
+    "TargetBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "configuration_id": {
+          "format": "uuid",
+          "title": "Configuration Id",
+          "type": "string"
+        },
+        "configuration_digest": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Configuration Digest",
+          "type": "string"
+        },
+        "environment_id": {
+          "format": "uuid",
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "classification": {
+          "enum": [
+            "nonproduction",
+            "production"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "resource_id": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "endpoint": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "database": {
+          "default": "",
+          "maxLength": 128,
+          "title": "Database",
+          "type": "string"
+        },
+        "identity_ref": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Identity Ref",
+          "type": "string"
+        },
+        "client_id": {
+          "format": "uuid",
+          "title": "Client Id",
+          "type": "string"
+        },
+        "token_scope": {
+          "default": "",
+          "maxLength": 512,
+          "title": "Token Scope",
+          "type": "string"
+        },
+        "operations": {
+          "items": {
+            "$ref": "#/$defs/AllowedOperation"
+          },
+          "maxItems": 200,
+          "minItems": 1,
+          "title": "Operations",
+          "type": "array"
+        },
+        "timeout_seconds": {
+          "default": 30,
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "max_response_bytes": {
+          "default": 65536,
+          "maximum": 65536,
+          "minimum": 1024,
+          "title": "Max Response Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "configuration_id",
+        "configuration_digest",
+        "environment_id",
+        "classification",
+        "resource_id",
+        "endpoint",
+        "identity_ref",
+        "client_id",
+        "operations"
+      ],
+      "title": "TargetBinding",
+      "type": "object"
+    }
+  },
+  "items": {
+    "$ref": "#/$defs/TargetBinding"
+  },
+  "type": "array"
+}

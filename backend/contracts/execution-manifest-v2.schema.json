@@ -1,0 +1,1486 @@
+{
+  "$defs": {
+    "AssetPin": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "title": "Name",
+          "type": "string"
+        },
+        "media_type": {
+          "title": "Media Type",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "media_type",
+        "sha256",
+        "size"
+      ],
+      "title": "AssetPin",
+      "type": "object"
+    },
+    "BoardDraft": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "exercise-preparation-draft/v1",
+          "default": "exercise-preparation-draft/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "title": "Name",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/PreparationStep"
+          },
+          "maxItems": 200,
+          "title": "Steps",
+          "type": "array"
+        },
+        "window": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PreparationWindow"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "notification_budget": {
+          "default": 0,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Notification Budget",
+          "type": "integer"
+        },
+        "recovery": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Recovery",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "BoardDraft",
+      "type": "object"
+    },
+    "ConfigurationSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "workspace_id": {
+          "format": "uuid",
+          "title": "Workspace Id",
+          "type": "string"
+        },
+        "connection_id": {
+          "format": "uuid",
+          "title": "Connection Id",
+          "type": "string"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "content": {
+          "$ref": "#/$defs/ConnectionConfiguration"
+        },
+        "digest": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Digest",
+          "type": "string"
+        },
+        "connection_kind": {
+          "enum": [
+            "sql",
+            "rest",
+            "graph"
+          ],
+          "title": "Connection Kind",
+          "type": "string"
+        },
+        "connection_name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "title": "Connection Name",
+          "type": "string"
+        },
+        "environment_id": {
+          "format": "uuid",
+          "title": "Environment Id",
+          "type": "string"
+        },
+        "environment_name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "title": "Environment Name",
+          "type": "string"
+        },
+        "template_asset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AssetPin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "created_by": {
+          "format": "uuid",
+          "title": "Created By",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "execution_authorized": {
+          "const": false,
+          "default": false,
+          "title": "Execution Authorized",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "workspace_id",
+        "connection_id",
+        "version",
+        "content",
+        "digest",
+        "connection_kind",
+        "connection_name",
+        "environment_id",
+        "environment_name",
+        "created_by",
+        "created_at"
+      ],
+      "title": "ConfigurationSnapshot",
+      "type": "object"
+    },
+    "ConnectionConfiguration": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "connection-configuration/v1",
+          "default": "connection-configuration/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "classification": {
+          "default": "unknown",
+          "enum": [
+            "unknown",
+            "nonproduction",
+            "production"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "resource_id": {
+          "default": "",
+          "maxLength": 512,
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "endpoint": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "database": {
+          "default": "",
+          "maxLength": 128,
+          "title": "Database",
+          "type": "string"
+        },
+        "identity_ref": {
+          "default": "",
+          "maxLength": 512,
+          "title": "Identity Ref",
+          "type": "string"
+        },
+        "catalog": {
+          "$ref": "#/$defs/OperationCatalog"
+        },
+        "notification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NotificationConfiguration"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "catalog"
+      ],
+      "title": "ConnectionConfiguration",
+      "type": "object"
+    },
+    "FlowEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "source": {
+          "format": "uuid",
+          "title": "Source",
+          "type": "string"
+        },
+        "target": {
+          "format": "uuid",
+          "title": "Target",
+          "type": "string"
+        },
+        "label": {
+          "default": "",
+          "maxLength": 160,
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "target"
+      ],
+      "title": "FlowEdge",
+      "type": "object"
+    },
+    "FlowNode": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "action",
+            "condition",
+            "wait",
+            "approval"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "title": "Label",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "maxLength": 4000,
+          "title": "Detail",
+          "type": "string"
+        },
+        "connection_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Connection Id"
+        },
+        "environment_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Environment Id"
+        },
+        "position": {
+          "$ref": "#/$defs/Position"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "label",
+        "position"
+      ],
+      "title": "FlowNode",
+      "type": "object"
+    },
+    "GraphInvocation": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "graph",
+          "title": "Kind",
+          "type": "string"
+        },
+        "template_key": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,79}$",
+          "title": "Template Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "template_key"
+      ],
+      "title": "GraphInvocation",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "NotificationConfiguration": {
+      "additionalProperties": false,
+      "properties": {
+        "template_asset_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template Asset Id"
+        },
+        "sender": {
+          "default": "",
+          "maxLength": 254,
+          "title": "Sender",
+          "type": "string"
+        },
+        "recipients": {
+          "items": {
+            "maxLength": 254,
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Recipients",
+          "type": "array"
+        },
+        "trusted_link": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Trusted Link",
+          "type": "string"
+        }
+      },
+      "title": "NotificationConfiguration",
+      "type": "object"
+    },
+    "Objective": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "title": "Title",
+          "type": "string"
+        },
+        "criterion": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Criterion",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "criterion"
+      ],
+      "title": "Objective",
+      "type": "object"
+    },
+    "ObjectiveRule": {
+      "additionalProperties": false,
+      "properties": {
+        "objective_id": {
+          "format": "uuid",
+          "title": "Objective Id",
+          "type": "string"
+        },
+        "step_id": {
+          "format": "uuid",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "field": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "title": "Field",
+          "type": "string"
+        },
+        "operator": {
+          "enum": [
+            "eq",
+            "ne",
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/PriorResultReference"
+            }
+          ],
+          "title": "Value"
+        },
+        "anchor_step_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Anchor Step Id"
+        },
+        "anchor_field": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Anchor Field"
+        },
+        "within_seconds": {
+          "anyOf": [
+            {
+              "maximum": 604800,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Within Seconds"
+        },
+        "source_time_field": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Time Field"
+        }
+      },
+      "required": [
+        "objective_id",
+        "step_id",
+        "field",
+        "operator",
+        "value"
+      ],
+      "title": "ObjectiveRule",
+      "type": "object"
+    },
+    "Observation": {
+      "additionalProperties": false,
+      "properties": {
+        "step_id": {
+          "format": "uuid",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "field": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "title": "Field",
+          "type": "string"
+        },
+        "operator": {
+          "enum": [
+            "eq",
+            "ne",
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "title": "Value"
+        },
+        "interval_seconds": {
+          "default": 10,
+          "maximum": 3600,
+          "minimum": 1,
+          "title": "Interval Seconds",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 600,
+          "maximum": 86400,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "max_samples": {
+          "default": 100,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Max Samples",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "step_id",
+        "field",
+        "operator",
+        "value"
+      ],
+      "title": "Observation",
+      "type": "object"
+    },
+    "OperationBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "configuration_id": {
+          "format": "uuid",
+          "title": "Configuration Id",
+          "type": "string"
+        },
+        "operation_key": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,79}$",
+          "title": "Operation Key",
+          "type": "string"
+        },
+        "operation_version": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,31}$",
+          "title": "Operation Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "configuration_id",
+        "operation_key",
+        "operation_version"
+      ],
+      "title": "OperationBinding",
+      "type": "object"
+    },
+    "OperationCatalog": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "operation-catalog/v1",
+          "default": "operation-catalog/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "title": "Name",
+          "type": "string"
+        },
+        "operations": {
+          "items": {
+            "$ref": "#/$defs/OperationDefinition"
+          },
+          "maxItems": 200,
+          "title": "Operations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "operations"
+      ],
+      "title": "OperationCatalog",
+      "type": "object"
+    },
+    "OperationDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,79}$",
+          "title": "Key",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,31}$",
+          "title": "Version",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "title": "Label",
+          "type": "string"
+        },
+        "effect": {
+          "enum": [
+            "read",
+            "write",
+            "notify"
+          ],
+          "title": "Effect",
+          "type": "string"
+        },
+        "invocation": {
+          "discriminator": {
+            "mapping": {
+              "graph": "#/$defs/GraphInvocation",
+              "rest": "#/$defs/RestInvocation",
+              "sql": "#/$defs/SqlInvocation"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/SqlInvocation"
+            },
+            {
+              "$ref": "#/$defs/RestInvocation"
+            },
+            {
+              "$ref": "#/$defs/GraphInvocation"
+            }
+          ],
+          "title": "Invocation"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/OperationField"
+          },
+          "maxItems": 100,
+          "title": "Parameters",
+          "type": "array"
+        },
+        "results": {
+          "items": {
+            "$ref": "#/$defs/OperationField"
+          },
+          "maxItems": 100,
+          "title": "Results",
+          "type": "array"
+        },
+        "recovery": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "title": "Recovery",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "version",
+        "label",
+        "effect",
+        "invocation",
+        "parameters",
+        "results",
+        "recovery"
+      ],
+      "title": "OperationDefinition",
+      "type": "object"
+    },
+    "OperationField": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "string",
+            "integer",
+            "number",
+            "boolean",
+            "uuid",
+            "datetime"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "minimum": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum"
+        },
+        "maximum": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maximum"
+        },
+        "max_length": {
+          "anyOf": [
+            {
+              "maximum": 4000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Length"
+        },
+        "choices": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              "maxItems": 100,
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Choices"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "OperationField",
+      "type": "object"
+    },
+    "Position": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "maximum": 100000,
+          "minimum": -100000,
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "maximum": 100000,
+          "minimum": -100000,
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "Position",
+      "type": "object"
+    },
+    "PreparationManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "exercise-preparation/v1",
+          "default": "exercise-preparation/v1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "board_id": {
+          "format": "uuid",
+          "title": "Board Id",
+          "type": "string"
+        },
+        "workspace_id": {
+          "format": "uuid",
+          "title": "Workspace Id",
+          "type": "string"
+        },
+        "board_version": {
+          "minimum": 1,
+          "title": "Board Version",
+          "type": "integer"
+        },
+        "draft": {
+          "$ref": "#/$defs/BoardDraft"
+        },
+        "scenario": {
+          "$ref": "#/$defs/ScenarioPin"
+        },
+        "assets": {
+          "items": {
+            "$ref": "#/$defs/AssetPin"
+          },
+          "title": "Assets",
+          "type": "array"
+        },
+        "configurations": {
+          "items": {
+            "$ref": "#/$defs/ConfigurationSnapshot"
+          },
+          "title": "Configurations",
+          "type": "array"
+        },
+        "execution_authorized": {
+          "const": false,
+          "default": false,
+          "title": "Execution Authorized",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "board_id",
+        "workspace_id",
+        "board_version",
+        "draft",
+        "scenario",
+        "assets",
+        "configurations"
+      ],
+      "title": "PreparationManifest",
+      "type": "object"
+    },
+    "PreparationStep": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "title": "Label",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "operation",
+            "condition",
+            "wait"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "authoring_node_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Authoring Node Id"
+        },
+        "depends_on": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 200,
+          "title": "Depends On",
+          "type": "array"
+        },
+        "binding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OperationBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "parameters": {
+          "maxProperties": 100,
+          "patternProperties": {
+            "^[A-Za-z_][A-Za-z0-9_]{0,63}$": {
+              "anyOf": [
+                {
+                  "maxLength": 4000,
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "$ref": "#/$defs/PriorResultReference"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "title": "Parameters",
+          "type": "object"
+        },
+        "wait_seconds": {
+          "anyOf": [
+            {
+              "maximum": 86400,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Wait Seconds"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StepCondition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "kind"
+      ],
+      "title": "PreparationStep",
+      "type": "object"
+    },
+    "PreparationWindow": {
+      "additionalProperties": false,
+      "properties": {
+        "starts_at": {
+          "format": "date-time",
+          "title": "Starts At",
+          "type": "string"
+        },
+        "ends_at": {
+          "format": "date-time",
+          "title": "Ends At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "starts_at",
+        "ends_at"
+      ],
+      "title": "PreparationWindow",
+      "type": "object"
+    },
+    "PriorResultReference": {
+      "additionalProperties": false,
+      "description": "A required declared result of a guaranteed earlier operation; never evaluated here.",
+      "properties": {
+        "source_step_id": {
+          "format": "uuid",
+          "title": "Source Step Id",
+          "type": "string"
+        },
+        "field": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "title": "Field",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_step_id",
+        "field"
+      ],
+      "title": "PriorResultReference",
+      "type": "object"
+    },
+    "RecoveryBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "step_id": {
+          "format": "uuid",
+          "title": "Step Id",
+          "type": "string"
+        },
+        "binding": {
+          "$ref": "#/$defs/OperationBinding"
+        },
+        "parameters": {
+          "patternProperties": {
+            "^[A-Za-z_][A-Za-z0-9_]{0,63}$": {
+              "anyOf": [
+                {
+                  "maxLength": 4000,
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "$ref": "#/$defs/PriorResultReference"
+                }
+              ]
+            }
+          },
+          "title": "Parameters",
+          "type": "object"
+        },
+        "ownership_parameter": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "title": "Ownership Parameter",
+          "type": "string"
+        },
+        "version_parameter": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "title": "Version Parameter",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step_id",
+        "binding",
+        "parameters",
+        "ownership_parameter",
+        "version_parameter"
+      ],
+      "title": "RecoveryBinding",
+      "type": "object"
+    },
+    "RestInvocation": {
+      "additionalProperties": false,
+      "description": "Description only: expected_version maps to future strong If-Match.\n\nIt is a string with explicit max_length and a bare, unquoted opaque value.\nThe future dispatcher owns Idempotency-Key; catalogs cannot supply headers.\nRemaining non-path parameters are GET query fields or a flat write body.",
+      "properties": {
+        "kind": {
+          "const": "rest",
+          "title": "Kind",
+          "type": "string"
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "method",
+        "path"
+      ],
+      "title": "RestInvocation",
+      "type": "object"
+    },
+    "ScenarioContent": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "title": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": ".*\\S.*",
+          "title": "Title",
+          "type": "string"
+        },
+        "document": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Document",
+          "type": "object"
+        },
+        "objectives": {
+          "items": {
+            "$ref": "#/$defs/Objective"
+          },
+          "maxItems": 500,
+          "title": "Objectives",
+          "type": "array"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/FlowNode"
+          },
+          "maxItems": 5000,
+          "title": "Nodes",
+          "type": "array"
+        },
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/FlowEdge"
+          },
+          "maxItems": 10000,
+          "title": "Edges",
+          "type": "array"
+        },
+        "asset_ids": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 5000,
+          "title": "Asset Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "title": "ScenarioContent",
+      "type": "object"
+    },
+    "ScenarioPin": {
+      "additionalProperties": false,
+      "properties": {
+        "scenario_id": {
+          "format": "uuid",
+          "title": "Scenario Id",
+          "type": "string"
+        },
+        "revision_version": {
+          "minimum": 1,
+          "title": "Revision Version",
+          "type": "integer"
+        },
+        "content": {
+          "$ref": "#/$defs/ScenarioContent"
+        }
+      },
+      "required": [
+        "scenario_id",
+        "revision_version",
+        "content"
+      ],
+      "title": "ScenarioPin",
+      "type": "object"
+    },
+    "SqlInvocation": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "sql",
+          "title": "Kind",
+          "type": "string"
+        },
+        "procedure": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}\\.[A-Za-z_][A-Za-z0-9_]{0,127}$",
+          "title": "Procedure",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "procedure"
+      ],
+      "title": "SqlInvocation",
+      "type": "object"
+    },
+    "StepCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "source_step_id": {
+          "format": "uuid",
+          "title": "Source Step Id",
+          "type": "string"
+        },
+        "result_field": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+          "title": "Result Field",
+          "type": "string"
+        },
+        "operator": {
+          "enum": [
+            "eq",
+            "ne",
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "title": "Operator",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maxLength": 4000,
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "title": "Value"
+        },
+        "if_true": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 200,
+          "title": "If True",
+          "type": "array"
+        },
+        "if_false": {
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "maxItems": 200,
+          "title": "If False",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_step_id",
+        "result_field",
+        "operator",
+        "value"
+      ],
+      "title": "StepCondition",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "exercise-execution/v2",
+      "default": "exercise-execution/v2",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "run_id": {
+      "format": "uuid",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "preparation": {
+      "$ref": "#/$defs/PreparationManifest"
+    },
+    "trigger": {
+      "enum": [
+        "manual",
+        "scheduled"
+      ],
+      "title": "Trigger",
+      "type": "string"
+    },
+    "observations": {
+      "items": {
+        "$ref": "#/$defs/Observation"
+      },
+      "title": "Observations",
+      "type": "array"
+    },
+    "objectives": {
+      "items": {
+        "$ref": "#/$defs/ObjectiveRule"
+      },
+      "title": "Objectives",
+      "type": "array"
+    },
+    "recovery": {
+      "items": {
+        "$ref": "#/$defs/RecoveryBinding"
+      },
+      "title": "Recovery",
+      "type": "array"
+    },
+    "sql_idempotency": {
+      "const": "dispatcher-owned/v1",
+      "default": "dispatcher-owned/v1",
+      "title": "Sql Idempotency",
+      "type": "string"
+    },
+    "max_operations": {
+      "default": 1000,
+      "maximum": 1000,
+      "minimum": 1,
+      "title": "Max Operations",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "run_id",
+    "preparation",
+    "trigger",
+    "observations",
+    "objectives",
+    "recovery"
+  ],
+  "title": "RunManifest",
+  "type": "object"
+}

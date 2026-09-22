@@ -17,6 +17,7 @@ from sqlalchemy import (
     UnicodeText,
     UniqueConstraint,
     create_engine,
+    text,
 )
 from sqlalchemy.dialects.mssql import DATETIME2
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
@@ -73,6 +74,32 @@ class Environment(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     name: Mapped[str] = mapped_column(Unicode(160))
+
+
+class EnvironmentPolicyRecord(Base):
+    __tablename__ = "environment_policies"
+    __table_args__ = (
+        CheckConstraint("version >= 1", name="ck_environment_policy_version"),
+        CheckConstraint(
+            "classification IN ('unknown', 'nonproduction', 'production')",
+            name="ck_environment_policy_classification",
+        ),
+        CheckConstraint(
+            "classification <> 'production' OR approval_required = 1",
+            name="ck_production_requires_approval",
+        ),
+        CheckConstraint(
+            "classification <> 'unknown' OR execution_enabled = 0",
+            name="ck_unclassified_execution_disabled",
+        ),
+    )
+    environment_id: Mapped[str] = mapped_column(ForeignKey("environments.id"), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    classification: Mapped[str] = mapped_column(String(16))
+    execution_enabled: Mapped[bool] = mapped_column(Boolean)
+    approval_required: Mapped[bool] = mapped_column(Boolean)
+    actor: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
 
 
 class Connection(Base):
@@ -310,6 +337,147 @@ class ApprovalRevocation(Base):
     actor: Mapped[str] = mapped_column(String(36))
     created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
     correlation_id: Mapped[str] = mapped_column(String(36))
+
+
+class ExecutionGrant(Base):
+    __tablename__ = "execution_grants"
+    __table_args__ = (
+        CheckConstraint("capability IN ('operator', 'reviewer')", name="ck_execution_capability"),
+        Index("ix_execution_grant_actor", "workspace_id", "object_id", "capability"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"))
+    object_id: Mapped[str] = mapped_column(String(36))
+    capability: Mapped[str] = mapped_column(String(16))
+    granted_by: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+
+
+class ExecutionGrantRevocation(Base):
+    __tablename__ = "execution_grant_revocations"
+    grant_id: Mapped[str] = mapped_column(ForeignKey("execution_grants.id"), primary_key=True)
+    actor: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+
+
+class ExerciseRun(Base):
+    __tablename__ = "exercise_runs"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    board_id: Mapped[str] = mapped_column(ForeignKey("boards.id"), index=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"))
+    operator: Mapped[str] = mapped_column(String(36))
+    grant_id: Mapped[str] = mapped_column(ForeignKey("execution_grants.id"))
+    manifest: Mapped[str] = mapped_column(UnicodeText)
+    digest: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+
+
+class ExerciseRunState(Base):
+    __tablename__ = "exercise_run_states"
+    __table_args__ = (
+        Index("uq_active_board_run", "board_id", unique=True, mssql_where=text("active = 1")),
+        CheckConstraint("version >= 1", name="ck_exercise_run_version"),
+        CheckConstraint("phase IN ('exercise', 'recovery')", name="ck_exercise_run_phase"),
+    )
+    run_id: Mapped[str] = mapped_column(ForeignKey("exercise_runs.id"), primary_key=True)
+    board_id: Mapped[str] = mapped_column(ForeignKey("boards.id"))
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    state: Mapped[str] = mapped_column(String(32), default="prepared")
+    phase: Mapped[str] = mapped_column(String(16), default="exercise")
+    active: Mapped[bool] = mapped_column(Boolean, default=False)
+    stop_requested: Mapped[bool] = mapped_column(Boolean, default=False)
+    reason: Mapped[str | None] = mapped_column(Unicode(1000), nullable=True)
+    context_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+
+class RunAuthorization(Base):
+    __tablename__ = "run_authorizations"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    run_id: Mapped[str] = mapped_column(ForeignKey("exercise_runs.id"), index=True)
+    phase: Mapped[str] = mapped_column(String(16))
+    policy_versions: Mapped[str] = mapped_column(UnicodeText)
+    binding_digest: Mapped[str] = mapped_column(String(64))
+    readiness_ids: Mapped[str] = mapped_column(UnicodeText)
+    approval_required: Mapped[bool] = mapped_column(Boolean)
+    actor: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+
+
+class RunApproval(Base):
+    __tablename__ = "run_approvals"
+    __table_args__ = (
+        CheckConstraint("decision IN ('approved', 'rejected')", name="ck_run_approval_decision"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    context_id: Mapped[str] = mapped_column(ForeignKey("run_authorizations.id"), index=True)
+    reviewer: Mapped[str] = mapped_column(String(36))
+    grant_id: Mapped[str] = mapped_column(ForeignKey("execution_grants.id"))
+    decision: Mapped[str] = mapped_column(String(16))
+    expires_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME)
+    note: Mapped[str] = mapped_column(Unicode(2000))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+
+
+class RunApprovalRevocation(Base):
+    __tablename__ = "run_approval_revocations"
+    approval_id: Mapped[str] = mapped_column(ForeignKey("run_approvals.id"), primary_key=True)
+    actor: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+
+
+class TargetReadiness(Base):
+    __tablename__ = "target_readiness"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    configuration_id: Mapped[str] = mapped_column(
+        ForeignKey("connection_configurations.id"), index=True
+    )
+    configuration_digest: Mapped[str] = mapped_column(String(64))
+    binding_digest: Mapped[str] = mapped_column(String(64))
+    evidence_reference: Mapped[str] = mapped_column(Unicode(512))
+    actor: Mapped[str] = mapped_column(Unicode(256))
+    checked_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME)
+    expires_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME)
+
+
+class RunStep(Base):
+    __tablename__ = "run_steps"
+    run_id: Mapped[str] = mapped_column(ForeignKey("exercise_runs.id"), primary_key=True)
+    phase: Mapped[str] = mapped_column(String(16), primary_key=True)
+    step_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    state: Mapped[str] = mapped_column(String(32), default="pending")
+    result: Mapped[str] = mapped_column(UnicodeText, default="{}")
+    parameters: Mapped[str | None] = mapped_column(UnicodeText, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Unicode(1000), nullable=True)
+    attempt_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    samples: Mapped[int] = mapped_column(Integer, default=0)
+    next_at: Mapped[datetime | None] = mapped_column(PREPARATION_DATETIME, nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(PREPARATION_DATETIME, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(PREPARATION_DATETIME, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(PREPARATION_DATETIME, nullable=True)
+
+
+class RunEvent(Base):
+    __tablename__ = "run_events"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    run_id: Mapped[str] = mapped_column(ForeignKey("exercise_runs.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(48))
+    step_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    detail: Mapped[str] = mapped_column(UnicodeText)
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+
+
+class RunDispatch(Base):
+    __tablename__ = "run_dispatches"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("exercise_runs.id"))
+    phase: Mapped[str] = mapped_column(String(16))
+    state: Mapped[str] = mapped_column(String(16), default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+    lease_token: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    lease_until: Mapped[datetime | None] = mapped_column(PREPARATION_DATETIME, nullable=True)
+    control_version: Mapped[int] = mapped_column(Integer, default=0)
+    delivered_version: Mapped[int] = mapped_column(Integer, default=0)
 
 
 @lru_cache

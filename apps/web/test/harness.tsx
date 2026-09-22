@@ -7,6 +7,8 @@ import { Studio, StudioContent } from '../src/Studio'
 import { Library, WorkspacePage } from '../src/Library'
 import { PreparationBoard } from '../src/PreparationBoard'
 import { ConnectionConfigurations } from '../src/ConnectionConfigurations'
+import { AdminSettings } from '../src/AdminSettings'
+import { ExerciseRun } from '../src/ExerciseRuns'
 import '../src/styles.css'
 
 if (!import.meta.env.DEV || import.meta.env.MODE !== 'test') {
@@ -43,6 +45,8 @@ const router = createBrowserRouter([
       { path: 'w/:wid/s/:sid', element: <Studio /> },
       { path: 'w/:wid/boards/:bid', element: <PreparationBoard /> },
       { path: 'w/:wid/connections/:cid', element: <ConnectionConfigurations /> },
+      { path: 'settings', element: <AdminSettings /> },
+      { path: 'w/:wid/runs/:rid', element: <ExerciseRun /> },
     ],
   },
   { path: '*', element: <p>Left the test studio.</p> },
