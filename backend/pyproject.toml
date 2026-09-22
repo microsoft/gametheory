@@ -1,0 +1,52 @@
+[project]
+name = "gametheory"
+version = "0.1.0"
+description = "Game Theory authoring control plane and durable planning worker"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi>=0.121,<1",
+  "uvicorn[standard]>=0.35,<1",
+  "pydantic-settings>=2.10,<3",
+  "sqlalchemy>=2.0.43,<2.1",
+  "alembic>=1.16,<2",
+  "pyodbc>=5.2,<6",
+  "azure-identity>=1.24,<2",
+  "azure-storage-blob>=12.26,<13",
+  "PyJWT[crypto]>=2.10,<3",
+  "python-multipart>=0.0.20",
+  "agent-framework-core==1.18.0",
+  "agent-framework-foundry==1.13.0",
+  "durabletask-azuremanaged==1.10.1",
+]
+
+[project.scripts]
+gametheory = "gametheory.cli:main"
+gametheory-worker = "gametheory.worker:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9", "httpx>=0.28,<1", "ruff>=0.12", "mypy>=1.17"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: requires explicitly configured SQL Server test database"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501", "B008"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
+ignore_missing_imports = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gametheory"]

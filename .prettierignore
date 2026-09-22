@@ -1,0 +1,5 @@
+node_modules/
+backend/
+apps/web/dist/
+apps/web/src/api.generated.ts
+package-lock.json

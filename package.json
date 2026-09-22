@@ -1,0 +1,20 @@
+{
+  "name": "gametheory",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w apps/web --",
+    "build": "npm run build -w apps/web",
+    "test": "npm run test -w apps/web",
+    "test:e2e": "playwright test",
+    "contracts": "openapi-typescript backend/openapi.json -o apps/web/src/api.generated.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "openapi-typescript": "^7.9.1",
+    "prettier": "^3.6.2",
+    "azurite": "^3.35.0"
+  }
+}
