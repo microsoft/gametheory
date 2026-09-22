@@ -1,17 +1,31 @@
 # Flood response pilot: product and exercise-environment handoff
 
-Status: **Draft for review, not deployment or execution authorization.**
+Status: **Preparation and independent-lab development selected; not deployment
+or execution authorization.**
 
 The user proposed two coordinated tracks: extend Game Theory, and establish a
 controlled Azure environment containing databases, APIs, and Microsoft Graph
 email integration to exercise the complete workflow. Reuse suitable existing
 infrastructure rather than provisioning every service from scratch.
 
-Shelter capacity and resource escalation is the recommended working scenario.
-The user has not yet selected it or confirmed target resources, identities,
-mailboxes, recipients, costs, or execution permissions. Do not interpret this
-document, earlier Game Theory deployment approval, or a published scenario as
-approval to modify those targets.
+The user selected shelter capacity and resource escalation, with code-built
+external systems and supporting files in `exercises/flood-response/`. Target
+resources, identities, mailboxes, recipients, costs, and execution permissions
+remain unapproved. Do not interpret this document, earlier Game Theory deployment
+approval, or a published scenario as approval to modify those targets.
+
+The first increment is preparation-only: generic connection configuration,
+pinned boards, static previews, and explicit independent approver grants with
+no self-approval. Preparation sign-off does not authorize execution, and a fresh
+execution approval will be required later. The external exercise has its own
+SQL/API/operational UI; it is not a Game Theory participant portal.
+
+Game Theory must not contain flood-specific product logic, built-in scenario
+templates, a starter kit, or a scenario installer. The user configures
+connections, registers external operation descriptions, uploads files, and
+authors the scenario and plan through the normal UI.
+[Generic preparation contracts](preparation-contracts.md) define that boundary.
+The end-to-end execution workflow below remains a later, separately gated goal.
 
 ## 1. Product intent and existing foundation
 
@@ -53,11 +67,17 @@ Use fictional shelters, occupancy figures, resource requests, and personnel.
 | Assess  | Observe the response through the API and evaluate objective criteria      | Evidence-linked met, unmet, or indeterminate results                      |
 | Recover | Clean up eligible exercise data or flag conflicts for review              | Per-record recovery result and unresolved items                           |
 
-Suggested pilot objectives, subject to review:
+The selected editable demonstration profile uses:
 
-- Identify the capacity breach within a bounded observation interval.
+- Identify an occupancy breach above 85% within two minutes of the committed
+  injection event.
 - Receive an acknowledgement within ten minutes of request creation.
-- Record an adequate resource allocation within the agreed response window.
+- Record the requested resource quantities within twenty minutes of request
+  creation.
+
+These are synthetic example values, not approved live policy. The notification
+budget is one initial notification and at most one escalation; actual sending
+remains disabled until separately authorized.
 
 Define each measurement's clock and evidence source before implementation.
 Observation delays and missing evidence must not be interpreted as proof of
@@ -235,16 +255,16 @@ network paths, identity support, capacity, and operational ownership.
 
 Present a concrete resource proposal for approval covering:
 
-| Decision                                                            | Current status        |
-| ------------------------------------------------------------------- | --------------------- |
-| Shelter-capacity pilot versus another flood workflow                | Proposed, unconfirmed |
-| Target subscription and existing SQL server                         | Not selected          |
-| New exercise database, schema, SKU, and cost ceiling                | Not approved          |
-| API/UI hosting and network access for participants and workers      | Not selected          |
-| Exercise operators, participants, approvers, and execution policy   | Not selected          |
-| Graph tenant, identity, sender mailbox, and recipients              | Not approved          |
-| Thresholds, observation windows, notification budget, and retention | Proposed, to define   |
-| Deployment ownership and cleanup responsibilities                   | To assign             |
+| Decision                                                            | Current status                                                                |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Shelter-capacity pilot versus another flood workflow                | Shelter-capacity scenario selected                                            |
+| Target subscription and existing SQL server                         | Not selected                                                                  |
+| New exercise database, schema, SKU, and cost ceiling                | Not approved                                                                  |
+| API/UI hosting and network access for participants and workers      | Not selected                                                                  |
+| Exercise operators, participants, approvers, and execution policy   | Named identities unselected; explicit preparation approvers, no self-approval |
+| Graph tenant, identity, sender mailbox, and recipients              | Not approved                                                                  |
+| Thresholds, observation windows, notification budget, and retention | Demonstration profile selected; live policy and retention unapproved          |
+| Deployment ownership and cleanup responsibilities                   | To assign                                                                     |
 
 Earlier approval to deploy the Game Theory studio does not authorize creating
 lab resources, adding new permissions, or sending email. Do not silently alter

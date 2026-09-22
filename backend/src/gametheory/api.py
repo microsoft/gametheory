@@ -21,6 +21,7 @@ from gametheory.domain import (
     CommentInput,
     ConnectionInput,
     MembershipInput,
+    MeView,
     Named,
     PlanningInput,
     ProposalContent,
@@ -46,6 +47,8 @@ from gametheory.persistence import (
     new_id,
     timestamp,
 )
+from gametheory.preparation_api import router as preparation_router
+from gametheory.preparation_service import preparation_workspace, revoke_reviewer_access
 from gametheory.service import (
     audit,
     expected_version,
@@ -150,9 +153,9 @@ def health() -> dict[str, str]:
     return {"status": "alive"}
 
 
-@app.get("/api/me")
-def me(actor: Actor, db: DB) -> dict[str, object]:
-    return {"object_id": actor.object_id, "organization_admin": is_admin(db, actor)}
+@app.get("/api/me", response_model=MeView)
+def me(actor: Actor, db: DB) -> MeView:
+    return MeView(object_id=actor.object_id, organization_admin=is_admin(db, actor))
 
 
 @app.get("/api/workspaces", response_model=list[WorkspaceView])
@@ -197,9 +200,9 @@ def members(wid: str, actor: Actor, db: DB) -> list[dict[str, str]]:
 def set_member(
     wid: str, body: MembershipInput, actor: Actor, db: DB, request: Request
 ) -> dict[str, str]:
-    authorize(db, actor, wid, "owner")
+    preparation_workspace(db, actor, wid, "owner", mutation=True)
     object_id = str(body.object_id)
-    if object_id == actor.object_id and not is_admin(db, actor):
+    if object_id == actor.object_id and not is_admin(db, actor, fence=True):
         raise HTTPException(422, "Ask another owner or administrator to change your own role")
     db.merge(Membership(workspace_id=wid, object_id=object_id, role=body.role))
     audit(db, actor, "membership.set", object_id, wid, correlation=request.state.correlation)
@@ -208,12 +211,13 @@ def set_member(
 
 @app.delete("/api/workspaces/{wid}/members/{oid}", status_code=204)
 def remove_member(wid: str, oid: str, actor: Actor, db: DB, request: Request) -> None:
-    authorize(db, actor, wid, "owner")
+    preparation_workspace(db, actor, wid, "owner", mutation=True)
     if oid == actor.object_id:
         raise HTTPException(422, "Ask another owner or administrator to remove your membership")
     member = db.get(Membership, (wid, oid))
     if member is None:
         raise HTTPException(404, "Membership not found")
+    revoke_reviewer_access(db, actor, wid, oid, request.state.correlation)
     db.delete(member)
     audit(db, actor, "membership.removed", oid, wid, correlation=request.state.correlation)
 
@@ -703,6 +707,8 @@ def decide_proposal(
         "scenario": result.model_dump(mode="json") if result else None,
     }
 
+
+app.include_router(preparation_router)
 
 dist = Path(get_settings().web_dist)
 if (dist / "assets").is_dir():

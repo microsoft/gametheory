@@ -1,0 +1,23 @@
+{
+  "synthetic": true,
+  "shelters": [
+    {
+      "key": "aster-reach",
+      "name": "Aster Reach School",
+      "capacity": 120,
+      "occupancy": 84
+    },
+    {
+      "key": "reedbank",
+      "name": "Reedbank Community Hall",
+      "capacity": 160,
+      "occupancy": 128
+    },
+    {
+      "key": "willow-bend",
+      "name": "Willow Bend Fieldhouse",
+      "capacity": 90,
+      "occupancy": 63
+    }
+  ]
+}

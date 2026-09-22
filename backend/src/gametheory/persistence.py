@@ -4,10 +4,26 @@ from functools import lru_cache
 from uuid import uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Unicode, UnicodeText, create_engine
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    String,
+    Unicode,
+    UnicodeText,
+    UniqueConstraint,
+    create_engine,
+)
+from sqlalchemy.dialects.mssql import DATETIME2
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from gametheory.config import get_settings
+
+PREPARATION_DATETIME: DateTime = DATETIME2(precision=6)  # type: ignore[no-untyped-call]
 
 
 def new_id() -> str:
@@ -157,6 +173,143 @@ class Audit(Base):
     version: Mapped[int | None] = mapped_column(Integer, nullable=True)
     correlation_id: Mapped[str] = mapped_column(String(36))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class ConnectionConfigurationRecord(Base):
+    __tablename__ = "connection_configurations"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id", "connection_id", "version", name="uq_configuration_version"
+        ),
+        CheckConstraint("version >= 1", name="ck_configuration_version"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    connection_id: Mapped[str] = mapped_column(ForeignKey("connections.id"))
+    version: Mapped[int] = mapped_column(Integer)
+    snapshot: Mapped[str] = mapped_column(UnicodeText)
+    created_by: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+    correlation_id: Mapped[str] = mapped_column(String(36))
+
+
+class ConfigurationWithdrawal(Base):
+    __tablename__ = "configuration_withdrawals"
+    configuration_id: Mapped[str] = mapped_column(
+        ForeignKey("connection_configurations.id"), primary_key=True
+    )
+    actor: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+    correlation_id: Mapped[str] = mapped_column(String(36))
+
+
+class WorkspaceApproverGrant(Base):
+    __tablename__ = "workspace_approver_grants"
+    __table_args__ = (Index("ix_approver_workspace_object", "workspace_id", "object_id"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"))
+    object_id: Mapped[str] = mapped_column(String(36))
+    granted_by: Mapped[str] = mapped_column(String(36))
+    granted_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+    correlation_id: Mapped[str] = mapped_column(String(36))
+
+
+class ApproverGrantRevocation(Base):
+    __tablename__ = "approver_grant_revocations"
+    grant_id: Mapped[str] = mapped_column(
+        ForeignKey("workspace_approver_grants.id"), primary_key=True
+    )
+    actor: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+    correlation_id: Mapped[str] = mapped_column(String(36))
+
+
+class PreparationBoard(Base):
+    __tablename__ = "boards"
+    __table_args__ = (CheckConstraint("version >= 1", name="ck_board_version"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    name: Mapped[str] = mapped_column(Unicode(160))
+    draft: Mapped[str] = mapped_column(UnicodeText)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    updated_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+
+
+class BoardOrigin(Base):
+    __tablename__ = "board_origins"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["scenario_id", "revision_version"], ["revisions.scenario_id", "revisions.version"]
+        ),
+    )
+    board_id: Mapped[str] = mapped_column(ForeignKey("boards.id"), primary_key=True)
+    scenario_id: Mapped[str] = mapped_column(String(36))
+    revision_version: Mapped[int] = mapped_column(Integer)
+    scenario: Mapped[str] = mapped_column(UnicodeText)
+    assets: Mapped[str] = mapped_column(UnicodeText)
+    created_by: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+
+
+class BoardContributor(Base):
+    __tablename__ = "board_contributors"
+    board_id: Mapped[str] = mapped_column(ForeignKey("boards.id"), primary_key=True)
+    object_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    first_version: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+    correlation_id: Mapped[str] = mapped_column(String(36))
+
+
+class PreparationPreview(Base):
+    __tablename__ = "board_previews"
+    __table_args__ = (UniqueConstraint("board_id", "sequence", name="uq_board_preview_sequence"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    board_id: Mapped[str] = mapped_column(ForeignKey("boards.id"), index=True)
+    board_version: Mapped[int] = mapped_column(Integer)
+    sequence: Mapped[int] = mapped_column(Integer)
+    digest: Mapped[str] = mapped_column(String(64))
+    manifest: Mapped[str] = mapped_column(UnicodeText)
+    findings: Mapped[str] = mapped_column(UnicodeText)
+    created_by: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+    correlation_id: Mapped[str] = mapped_column(String(36))
+
+
+class PreparationApproval(Base):
+    __tablename__ = "board_approvals"
+    __table_args__ = (
+        UniqueConstraint("board_id", "sequence", name="uq_board_approval_sequence"),
+        CheckConstraint("kind = 'preparation'", name="ck_approval_preparation_only"),
+        CheckConstraint("execution_authorized = 0", name="ck_approval_execution_disabled"),
+        CheckConstraint("acknowledge_unverified = 1", name="ck_approval_acknowledged"),
+        CheckConstraint("decision IN ('approved', 'rejected')", name="ck_approval_decision"),
+        CheckConstraint("expires_at > created_at", name="ck_approval_expiry"),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    board_id: Mapped[str] = mapped_column(ForeignKey("boards.id"), index=True)
+    board_version: Mapped[int] = mapped_column(Integer)
+    preview_id: Mapped[str] = mapped_column(ForeignKey("board_previews.id"))
+    digest: Mapped[str] = mapped_column(String(64))
+    sequence: Mapped[int] = mapped_column(Integer)
+    grant_id: Mapped[str] = mapped_column(ForeignKey("workspace_approver_grants.id"))
+    reviewer: Mapped[str] = mapped_column(String(36))
+    kind: Mapped[str] = mapped_column(String(16), default="preparation")
+    execution_authorized: Mapped[bool] = mapped_column(Boolean, default=False)
+    decision: Mapped[str] = mapped_column(String(16))
+    acknowledge_unverified: Mapped[bool] = mapped_column(Boolean, default=True)
+    expires_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME)
+    note: Mapped[str] = mapped_column(Unicode(2000))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+    correlation_id: Mapped[str] = mapped_column(String(36))
+
+
+class ApprovalRevocation(Base):
+    __tablename__ = "approval_revocations"
+    approval_id: Mapped[str] = mapped_column(ForeignKey("board_approvals.id"), primary_key=True)
+    reason: Mapped[str] = mapped_column(String(40))
+    actor: Mapped[str] = mapped_column(String(36))
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+    correlation_id: Mapped[str] = mapped_column(String(36))
 
 
 @lru_cache

@@ -1,0 +1,78 @@
+{
+  "schema_version": "operation-catalog/v1",
+  "name": "Synthetic flood lab — GRAPH descriptions",
+  "operations": [
+    {
+      "key": "notification.initial",
+      "version": "1",
+      "label": "Describe initial exercise notification (sending disabled)",
+      "effect": "notify",
+      "invocation": {
+        "kind": "graph",
+        "template_key": "flood-initial-v1"
+      },
+      "parameters": [
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "request_id",
+          "type": "uuid",
+          "required": true
+        }
+      ],
+      "results": [
+        {
+          "name": "outcome",
+          "type": "string",
+          "required": true,
+          "choices": [
+            "succeeded",
+            "rejected",
+            "failed",
+            "unknown"
+          ]
+        }
+      ],
+      "recovery": "DESCRIPTION ONLY. Graph sending is absent. Sender, recipient allowlist, immutable template and trusted link are unresolved. No delivery/acceptance is claimed. Email cannot be rolled back. One initial plus at most one escalation per request."
+    },
+    {
+      "key": "notification.escalation",
+      "version": "1",
+      "label": "Describe escalation exercise notification (sending disabled)",
+      "effect": "notify",
+      "invocation": {
+        "kind": "graph",
+        "template_key": "flood-escalation-v1"
+      },
+      "parameters": [
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "request_id",
+          "type": "uuid",
+          "required": true
+        }
+      ],
+      "results": [
+        {
+          "name": "outcome",
+          "type": "string",
+          "required": true,
+          "choices": [
+            "succeeded",
+            "rejected",
+            "failed",
+            "unknown"
+          ]
+        }
+      ],
+      "recovery": "DESCRIPTION ONLY. Graph sending is absent. Sender, recipient allowlist, immutable template and trusted link are unresolved. No delivery/acceptance is claimed. Email cannot be rolled back. One initial plus at most one escalation per request."
+    }
+  ]
+}

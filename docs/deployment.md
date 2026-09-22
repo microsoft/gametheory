@@ -80,6 +80,7 @@ because concurrent changes to a Cognitive Services account can conflict.
    ```
 
    Record the resulting digests for deployment. CI builds but never pushes images.
+
 5. As the SQL operator, apply Alembic migrations and create database users for the
    API and worker managed identities. Azure RBAC alone does not grant SQL data access.
    Resolving Entra principals for SQL user creation may require tenant/admin setup;
@@ -98,6 +99,7 @@ because concurrent changes to a Cognitive Services account can conflict.
 
    It refuses identity mismatches. It adds table grants, not database-owner roles,
    and does not revoke pre-existing grants; audit existing database users separately.
+
 7. Bootstrap the first organization administrator explicitly.
 8. Grant the worker appropriate native Foundry project/model access. The template
    grants Scheduler permissions and, for the optional dedicated project, Foundry
@@ -156,6 +158,28 @@ compatibility review. Test database backup/restore and asset retention independe
 Production approvals, actual organizational-system writes, recovery/compensation,
 Foundry agent registration, optional Agent 365 integration, and multi-cloud
 validation are outside this milestone.
+
+## Preparation schema rollout and exercise isolation
+
+Preparation introduces additive application tables and additional API-only
+table-scoped grants. Apply migrations and review runtime grants using the
+separate authorized operator identity before deploying an updated API. The
+planning worker must not acquire target-system permissions or treat preparation
+records as dispatch intents. Existing `plan_v1` instances and histories retain
+their original behavior.
+
+Registration of target metadata, environment classification, operation catalogs,
+or approver grants is not cloud authorization. The runtime still advertises
+execution as disabled. A preparation approval cannot become execution approval
+after a deployment or configuration change.
+
+The independent package in `exercises/flood-response/` has a separate deployment
+boundary. The application Docker targets do not bundle it. Its future hosting,
+dedicated exercise database, network paths, registrations, managed identities,
+SQL permissions, mailbox restrictions, recipients and resource budget require a
+new concrete resource proposal and explicit approval. Prior Game Theory deployment
+approval does not cover them. Do not run exercise migrations against the
+application database or alter private-network policy to make a preview pass.
 
 ## Partial deployment and private dependency probes
 

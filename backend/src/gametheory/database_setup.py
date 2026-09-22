@@ -18,6 +18,21 @@ API_PERMISSIONS = {
     "planning_requests": "SELECT, INSERT, UPDATE",
     "dispatch_intents": "SELECT, INSERT",
     "audit": "SELECT, INSERT",
+    "boards": "SELECT, INSERT, UPDATE",
+    **{
+        table: "SELECT, INSERT"
+        for table in (
+            "connection_configurations",
+            "configuration_withdrawals",
+            "workspace_approver_grants",
+            "approver_grant_revocations",
+            "board_origins",
+            "board_contributors",
+            "board_previews",
+            "board_approvals",
+            "approval_revocations",
+        )
+    },
 }
 WORKER_PERMISSIONS = {
     **{

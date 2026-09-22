@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowRight, FolderOpen, Network, Plus, ShieldCheck } from 'lucide-react'
 import { ErrorNotice, useSession } from './api'
 import type { Connection, Environment, Member, Scenario, Workspace } from './types'
+import type { Me } from './preparation'
+import { Approvers } from './Approvers'
+import { Boards } from './Boards'
 
 export function Library() {
   const { api } = useSession()
@@ -16,7 +19,7 @@ export function Library() {
   })
   const me = useQuery({
     queryKey: ['me'],
-    queryFn: () => api.get<{ organization_admin: boolean }>('/me'),
+    queryFn: () => api.get<Me>('/me'),
   })
   const create = useMutation({
     mutationFn: () => api.send<Workspace>('/workspaces', 'POST', { name }),
@@ -100,7 +103,12 @@ export function WorkspacePage() {
   const cache = useQueryClient()
   const navigate = useNavigate()
   const [name, setName] = useState('')
-  const [tab, setTab] = useState<'scenarios' | 'connections' | 'access'>('scenarios')
+  const [search, setSearch] = useSearchParams()
+  const selectedSection = search.get('section') ?? ''
+  const tab = ['scenarios', 'boards', 'connections', 'access'].includes(selectedSection)
+    ? selectedSection
+    : 'scenarios'
+  const setTab = (section: string) => setSearch({ section })
   const workspaces = useQuery({
     queryKey: ['workspaces'],
     queryFn: () => api.get<Workspace[]>('/workspaces'),
@@ -135,14 +143,15 @@ export function WorkspacePage() {
         <button aria-current={tab === 'scenarios'} onClick={() => setTab('scenarios')}>
           Scenarios
         </button>
+        <button aria-current={tab === 'boards'} onClick={() => setTab('boards')}>
+          Game boards
+        </button>
         <button aria-current={tab === 'connections'} onClick={() => setTab('connections')}>
           Connection inventory
         </button>
-        {workspace?.role === 'owner' && (
-          <button aria-current={tab === 'access'} onClick={() => setTab('access')}>
-            Access
-          </button>
-        )}
+        <button aria-current={tab === 'access'} onClick={() => setTab('access')}>
+          Access
+        </button>
       </nav>
       <ErrorNotice error={scenarios.error ?? workspaces.error ?? create.error} />
       {tab === 'scenarios' && (
@@ -202,7 +211,13 @@ export function WorkspacePage() {
         </>
       )}
       {tab === 'connections' && <Connections wid={wid} editable={!!editor} />}
-      {tab === 'access' && workspace?.role === 'owner' && <Access wid={wid} />}
+      {tab === 'boards' && <Boards wid={wid} editable={!!editor} />}
+      {tab === 'access' && (
+        <div className="stack">
+          {workspace?.role === 'owner' && <Access wid={wid} />}
+          <Approvers wid={wid} />
+        </div>
+      )}
     </main>
   )
 }
@@ -231,7 +246,7 @@ function Connections({ wid, editable }: { wid: string; editable: boolean }) {
   })
   const me = useQuery({
     queryKey: ['me'],
-    queryFn: () => api.get<{ organization_admin: boolean }>('/me'),
+    queryFn: () => api.get<Me>('/me'),
   })
   const create = useMutation({
     mutationFn: () =>
@@ -384,9 +399,24 @@ function Connections({ wid, editable }: { wid: string; editable: boolean }) {
             </span>{' '}
             <span className="pill">{row.scope}</span>
             <p className="muted">Inventory only · {row.kind}</p>
+            <Link className="text-action" to={`/w/${wid}/connections/${row.id}`}>
+              {me.data?.organization_admin ? 'Configure & view history' : 'Configuration history'}
+              <ArrowRight size={16} />
+            </Link>
           </article>
         ))}
       </div>
+      {rows.isPending && <p role="status">Loading connection inventory...</p>}
+      {rows.data?.length === 0 && (
+        <div className="empty glass">
+          <h2>No connections registered</h2>
+          <p>
+            {editable
+              ? 'Create an inventory record, then ask an organization administrator to register its configuration and operation catalog.'
+              : 'A workspace editor can create inventory. An organization administrator manages operation catalogs and target metadata.'}
+          </p>
+        </div>
+      )}
     </section>
   )
 }

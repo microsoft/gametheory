@@ -1,9 +1,17 @@
 """Initialize only the disposable, loopback CI SQL instance."""
 
+import argparse
 import os
+import re
 import time
 
 import pyodbc
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--database-name", default="gametheory_test")
+args = parser.parse_args()
+if not re.fullmatch(r"(?:gametheory_test|flood_lab_test)(?:_[A-Za-z0-9]+)*", args.database_name):
+    parser.error("Only explicitly named Game Theory or flood lab test databases are allowed")
 
 password = os.environ["TEST_SQL_PASSWORD"]
 connection = (
@@ -21,6 +29,6 @@ while True:
             raise
         time.sleep(2)
 try:
-    db.execute("IF DB_ID('gametheory_test') IS NULL CREATE DATABASE gametheory_test")
+    db.execute(f"IF DB_ID('{args.database_name}') IS NULL CREATE DATABASE [{args.database_name}]")
 finally:
     db.close()

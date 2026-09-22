@@ -1,0 +1,19 @@
+FROM node:24.1.0-bookworm-slim AS build
+WORKDIR /ui
+COPY ui/package.json ui/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY ui ./
+ARG VITE_ENTRA_TENANT_ID
+ARG VITE_ENTRA_CLIENT_ID
+ARG VITE_ENTRA_API_SCOPE
+ARG VITE_API_BASE_URL
+ENV VITE_ENTRA_TENANT_ID=$VITE_ENTRA_TENANT_ID \
+    VITE_ENTRA_CLIENT_ID=$VITE_ENTRA_CLIENT_ID \
+    VITE_ENTRA_API_SCOPE=$VITE_ENTRA_API_SCOPE \
+    VITE_API_BASE_URL=$VITE_API_BASE_URL
+RUN npm run build
+FROM nginx:1.28.0-alpine
+COPY --from=build /ui/dist /usr/share/nginx/html
+COPY ui/nginx.conf.template /etc/nginx/templates/default.conf.template
+ENV NGINX_ENVSUBST_FILTER=FLOOD_LAB_BROWSER_API_ORIGIN
+EXPOSE 8080

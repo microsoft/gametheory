@@ -6,6 +6,7 @@ from uuid import UUID
 import jwt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from gametheory.config import Settings, get_settings
@@ -63,22 +64,57 @@ def authenticate(
         ) from exc
 
 
-def is_admin(db: Session, actor: Principal) -> bool:
+def is_admin(db: Session, actor: Principal, *, fence: bool = False) -> bool:
+    if fence:
+        return (
+            db.scalar(
+                select(Administrator)
+                .where(
+                    Administrator.organization_id == actor.tenant,
+                    Administrator.object_id == actor.object_id,
+                )
+                .with_hint(Administrator, "WITH (HOLDLOCK)", dialect_name="mssql")
+                .execution_options(populate_existing=True)
+            )
+            is not None
+        )
     return db.get(Administrator, (actor.tenant, actor.object_id)) is not None
 
 
-def require_admin(db: Session, actor: Principal) -> None:
-    if not is_admin(db, actor):
+def require_admin(db: Session, actor: Principal, *, fence: bool = False) -> None:
+    if not is_admin(db, actor, fence=fence):
         raise HTTPException(403, "Organization administrator access is required")
 
 
-def authorize(db: Session, actor: Principal, workspace_id: str, role: str = "viewer") -> Role:
-    workspace = db.get(Workspace, workspace_id)
+def authorize(
+    db: Session, actor: Principal, workspace_id: str, role: str = "viewer", *, fence: bool = False
+) -> Role:
+    workspace = (
+        db.scalar(
+            select(Workspace)
+            .where(Workspace.id == workspace_id)
+            .with_hint(Workspace, "WITH (HOLDLOCK)", dialect_name="mssql")
+            .execution_options(populate_existing=True)
+        )
+        if fence
+        else db.get(Workspace, workspace_id)
+    )
     if workspace is None or workspace.organization_id != actor.tenant:
         raise HTTPException(404, "Workspace not found")
-    actual = "owner" if is_admin(db, actor) else None
+    actual = "owner" if is_admin(db, actor, fence=fence) else None
     if actual is None:
-        membership = db.get(Membership, (workspace_id, actor.object_id))
+        membership = (
+            db.scalar(
+                select(Membership)
+                .where(
+                    Membership.workspace_id == workspace_id, Membership.object_id == actor.object_id
+                )
+                .with_hint(Membership, "WITH (HOLDLOCK)", dialect_name="mssql")
+                .execution_options(populate_existing=True)
+            )
+            if fence
+            else db.get(Membership, (workspace_id, actor.object_id))
+        )
         actual = membership.role if membership else None
     levels = {"viewer": 0, "editor": 1, "owner": 2}
     if actual is None:

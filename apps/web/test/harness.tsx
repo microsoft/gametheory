@@ -1,9 +1,12 @@
 import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
+import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom'
 import { SessionContext, createApi } from '../src/api'
 import { Brand, ThemeButton } from '../src/App'
-import { StudioContent } from '../src/Studio'
+import { Studio, StudioContent } from '../src/Studio'
+import { Library, WorkspacePage } from '../src/Library'
+import { PreparationBoard } from '../src/PreparationBoard'
+import { ConnectionConfigurations } from '../src/ConnectionConfigurations'
 import '../src/styles.css'
 
 if (!import.meta.env.DEV || import.meta.env.MODE !== 'test') {
@@ -14,7 +17,7 @@ const cache = new QueryClient({
 })
 const router = createBrowserRouter([
   {
-    path: '/test.html',
+    path: '/',
     element: (
       <>
         <header className="app-header">
@@ -22,12 +25,25 @@ const router = createBrowserRouter([
           <span className="pill">TEST FIXTURE — NOT LIVE DATA</span>
           <ThemeButton />
         </header>
-        <StudioContent
-          wid="11111111-1111-4111-8111-111111111111"
-          sid="22222222-2222-4222-8222-222222222222"
-        />
+        <Outlet />
       </>
     ),
+    children: [
+      { index: true, element: <Library /> },
+      {
+        path: 'test.html',
+        element: (
+          <StudioContent
+            wid="11111111-1111-4111-8111-111111111111"
+            sid="22222222-2222-4222-8222-222222222222"
+          />
+        ),
+      },
+      { path: 'w/:wid', element: <WorkspacePage /> },
+      { path: 'w/:wid/s/:sid', element: <Studio /> },
+      { path: 'w/:wid/boards/:bid', element: <PreparationBoard /> },
+      { path: 'w/:wid/connections/:cid', element: <ConnectionConfigurations /> },
+    ],
   },
   { path: '*', element: <p>Left the test studio.</p> },
 ])

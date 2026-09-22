@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flood-response-lab"
+version = "1.0.0"
+description = "Isolated, synthetic shelter-capacity exercise system"
+requires-python = ">=3.12,<3.13"
+dynamic = ["dependencies", "optional-dependencies"]
+
+[project.scripts]
+flood-lab = "flood_lab.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.in"]}
+optional-dependencies.dev = {file = ["requirements-dev.in"]}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
+markers = ["sql: requires an explicitly selected dedicated disposable SQL Server database"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/flood_lab/api.py" = ["B008"]
+
+[tool.ruff.format]
+quote-style = "double"

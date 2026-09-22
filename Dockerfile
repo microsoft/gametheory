@@ -27,6 +27,8 @@ USER root
 COPY backend/requirements-dev.lock /tmp/requirements-dev.lock
 RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements-dev.lock
 COPY backend/tests backend/tests
+COPY backend/contracts backend/contracts
+COPY backend/operation-catalog.schema.json backend/operation-catalog.schema.json
 USER app
 CMD ["pytest", "-q", "backend/tests"]
 

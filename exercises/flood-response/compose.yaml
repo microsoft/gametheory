@@ -1,0 +1,22 @@
+name: flood-response-lab
+services:
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-CU20-ubuntu-22.04
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: "${FLOOD_LAB_ACCEPT_SQL_EULA:?Explicitly accept the SQL Server EULA}"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: "${FLOOD_LAB_SQL_ADMIN_PASSWORD:?Supply a local-only SQL administrator secret}"
+    ports:
+      - "127.0.0.1:${FLOOD_LAB_SQL_PORT:?Choose a dedicated loopback SQL port}:1433"
+    volumes:
+      - flood-lab-sql-data:/var/opt/mssql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'SQLCMDPASSWORD="$$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -Q "SELECT 1" -b -o /dev/null'
+      interval: 10s
+      timeout: 5s
+      retries: 20
+volumes:
+  flood-lab-sql-data:

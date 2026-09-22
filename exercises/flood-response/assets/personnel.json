@@ -1,0 +1,20 @@
+{
+  "synthetic": true,
+  "personnel": [
+    {
+      "name": "Aster Vale",
+      "role": "Synthetic shelter coordinator",
+      "shelter_key": "aster-reach"
+    },
+    {
+      "name": "Rowan Finch",
+      "role": "Synthetic logistics coordinator",
+      "shelter_key": "reedbank"
+    },
+    {
+      "name": "Maren Reed",
+      "role": "Synthetic exercise observer",
+      "shelter_key": "willow-bend"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+    access_log off;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://login.microsoftonline.com ${FLOOD_LAB_BROWSER_API_ORIGIN}; frame-src 'self' https://login.microsoftonline.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self' https://login.microsoftonline.com" always;
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+    location /test/ {
+        return 404;
+    }
+}

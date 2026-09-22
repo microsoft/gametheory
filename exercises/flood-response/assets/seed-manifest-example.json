@@ -1,0 +1,63 @@
+{
+  "schema_version": "flood-lab-seed/v1",
+  "synthetic": true,
+  "profile_version": "demonstration/v1",
+  "run_key": "demonstration-example",
+  "run_id": "f702f7dd-76e8-533e-a606-21583cc4ddda",
+  "owner_operation": "a42da853-c569-596d-8e06-af24f1c9743f",
+  "name": "Synthetic Riverwatch — demonstration-example",
+  "shelters": [
+    {
+      "key": "aster-reach",
+      "name": "Aster Reach School",
+      "capacity": 120,
+      "occupancy": 84,
+      "id": "20dd93bf-5370-5807-98b0-29e5bc174316",
+      "record_version": "a93830ec-f6ec-5237-abcd-77962e00123b"
+    },
+    {
+      "key": "reedbank",
+      "name": "Reedbank Community Hall",
+      "capacity": 160,
+      "occupancy": 128,
+      "id": "bf7adaa1-6115-52b0-9e81-cc5dcec12953",
+      "record_version": "1855c676-d910-5d53-8de6-d02cc3991a2c"
+    },
+    {
+      "key": "willow-bend",
+      "name": "Willow Bend Fieldhouse",
+      "capacity": 90,
+      "occupancy": 63,
+      "id": "e2782494-f69d-5cd8-bdb8-761f78e27705",
+      "record_version": "dddb98e8-c870-55a2-a4f8-86cae01250a8"
+    }
+  ],
+  "requests": [
+    {
+      "id": "0207e871-f4a0-57d7-98ae-0b61f1a213c9",
+      "shelter_id": "20dd93bf-5370-5807-98b0-29e5bc174316",
+      "resource_type": "blankets",
+      "quantity_requested": 40,
+      "summary": "EXERCISE ONLY — baseline blanket request for synthetic evacuees",
+      "needed_by_seconds_after_seed": 1200,
+      "record_version": "97002fef-a1c6-5507-8f66-0214277345ac"
+    }
+  ],
+  "personnel": [
+    {
+      "name": "Aster Vale",
+      "role": "Synthetic shelter coordinator",
+      "shelter_key": "aster-reach"
+    },
+    {
+      "name": "Rowan Finch",
+      "role": "Synthetic logistics coordinator",
+      "shelter_key": "reedbank"
+    },
+    {
+      "name": "Maren Reed",
+      "role": "Synthetic exercise observer",
+      "shelter_key": "willow-bend"
+    }
+  ]
+}

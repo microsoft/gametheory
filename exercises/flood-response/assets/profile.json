@@ -1,0 +1,20 @@
+{
+  "schema_version": "flood-lab-profile/v1",
+  "profile_version": "demonstration/v1",
+  "label": "DEMONSTRATION — EXERCISE ONLY — all people and places are fictional",
+  "capacity_trigger_percent": 85,
+  "capacity_trigger_comparison": "strictly_greater_than",
+  "detect_within_seconds": 120,
+  "acknowledge_within_seconds": 600,
+  "adequate_allocation_within_seconds": 1200,
+  "deadline_equality": "timely",
+  "missing_evidence": "indeterminate",
+  "maximum_initial_notifications": 1,
+  "maximum_escalations": 1,
+  "maximum_total_notifications": 2,
+  "graph_sending_enabled": false,
+  "sender": null,
+  "recipients": [],
+  "trusted_operational_link": null,
+  "test_clock_shortcuts": false
+}
