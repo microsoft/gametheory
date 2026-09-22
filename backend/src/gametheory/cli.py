@@ -33,6 +33,19 @@ def main() -> None:
     bootstrap.add_argument("--organization-name", required=True)
     schema = commands.add_parser("openapi", help="Export frontend API contract")
     schema.add_argument("--output", default="backend/openapi.json")
+    catalog_schema = commands.add_parser(
+        "operation-catalog-schema",
+        help="Export the standalone operation catalog JSON Schema",
+        description=(
+            "Run alongside 'gametheory openapi' from the repository root. External systems "
+            "can validate catalogs against this artifact without importing Game Theory."
+        ),
+    )
+    catalog_schema.add_argument("--output", default="backend/operation-catalog.schema.json")
+    preparation_schemas = commands.add_parser(
+        "preparation-schemas", help="Export non-executable preparation and future execution schemas"
+    )
+    preparation_schemas.add_argument("--directory", default="backend/contracts")
     cleanup = commands.add_parser(
         "cleanup-staged", help="Inspect or retire application-owned abandoned uploads"
     )
@@ -55,6 +68,33 @@ def main() -> None:
         from gametheory.api import app
 
         Path(args.output).write_text(json.dumps(app.openapi(), indent=2) + "\n")
+        return
+    if args.command == "operation-catalog-schema":
+        from gametheory.preparation import OperationCatalog
+
+        Path(args.output).write_text(
+            json.dumps(OperationCatalog.model_json_schema(), indent=2) + "\n"
+        )
+        return
+    if args.command == "preparation-schemas":
+        from gametheory.preparation import (
+            ConnectionConfiguration,
+            ExecutionManifest,
+            OperationCatalog,
+            PreparationManifest,
+        )
+
+        directory = Path(args.directory)
+        directory.mkdir(parents=True, exist_ok=True)
+        for filename, model in (
+            ("operation-catalog-v1.schema.json", OperationCatalog),
+            ("connection-configuration-v1.schema.json", ConnectionConfiguration),
+            ("preparation-manifest-v1.schema.json", PreparationManifest),
+            ("execution-manifest-v1.schema.json", ExecutionManifest),
+        ):
+            (directory / filename).write_text(
+                json.dumps(model.model_json_schema(), indent=2) + "\n"
+            )
         return
     if args.command == "cleanup-staged":
         if args.older_than_hours < 1:

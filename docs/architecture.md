@@ -1,23 +1,31 @@
-# Authoring architecture
+# Control-plane architecture
 
 Game Theory is an organization's exercise **control plane**. Participants continue
 working in their normal systems; there is no participant portal.
 
-This first milestone implements authoring, not exercise execution. A published
-scenario revision is an immutable authoring snapshot, **not** permission to run it.
-Connection records are inventory and availability grants, not activated integrations.
+This milestone implements authoring and preparation, not exercise execution. A
+published scenario revision is an immutable authoring snapshot, **not** permission
+to run it. Connection records and configuration revisions describe inventory and
+proposed integrations, not activated target access. Preparation approval is a
+review of a pinned snapshot and is explicitly not authorization to execute it.
 
 ## Components and authority
 
-| Component | Responsibility |
-| --- | --- |
-| React 18 / TypeScript / Vite / Tailwind | Mineral/ocean document-first studio, shared-draft editing, review, accessibility |
-| FastAPI / Pydantic | Authentication, workspace authorization, contracts, conditional writes |
-| Azure SQL | Authoritative memberships, drafts, revisions, asset metadata, conversations, proposals, dispatch intents, audit |
-| Private Blob Storage | Immutable uploaded asset versions |
-| Durable Task Scheduler | Orchestration history, activity delivery, retries and restart recovery |
-| Python Container Apps worker | Dispatch reconciliation and Agent Framework planning activities |
-| Operator-configured Foundry project/model | Model inference; no external mutation tools are exposed |
+| Component                                 | Responsibility                                                                                                  |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| React 18 / TypeScript / Vite / Tailwind   | Mineral/ocean document-first studio, shared-draft editing, review, accessibility                                |
+| FastAPI / Pydantic                        | Authentication, workspace authorization, contracts, conditional writes                                          |
+| Azure SQL                                 | Authoritative memberships, drafts, revisions, asset metadata, conversations, proposals, dispatch intents, audit |
+| Private Blob Storage                      | Immutable uploaded asset versions                                                                               |
+| Durable Task Scheduler                    | Orchestration history, activity delivery, retries and restart recovery                                          |
+| Python Container Apps worker              | Dispatch reconciliation and Agent Framework planning activities                                                 |
+| Operator-configured Foundry project/model | Model inference; no external mutation tools are exposed                                                         |
+
+The separate packages under `exercises/` emulate external operational systems.
+They are not imported or bundled by the product and do not share its application
+database. Their domain-specific catalogs and scenario files reach Game Theory
+only through ordinary user/admin UI configuration. There is no exercise installer
+or built-in scenario catalog.
 
 Web/API run together on App Service. The worker is a continuously running Container
 App, not a minute-scheduled job. Its small SQL outbox reconciler closes the
@@ -71,6 +79,49 @@ Inventory can be workspace-owned, organization-wide (including future workspaces
 or assigned to specified workspaces. No credentials are stored or exposed.
 Every node's connection must be available to its workspace, and its environment
 must match that connection. Unknown assets and cross-workspace references are rejected.
+
+Preparation uses these same workspace boundaries, but approval is an additional,
+explicit workspace capability. Administrator, owner, and editor roles do not
+automatically confer it. Organization administrators manage configuration and
+approver grants; a reviewer cannot approve a board they created or contributed to.
+No role receives exercise execution rights in this milestone.
+
+## Preparation contracts and boards
+
+[Preparation contracts v1](preparation-contracts.md) defines the generic operation
+catalog, immutable connection configurations, manifest boundary, and API surface.
+An uploaded operation description is not executable code or an authorization
+grant. SQL descriptions identify narrow stored procedures; REST descriptions
+identify bounded relative operations; Graph descriptions identify fixed templates.
+There are no arbitrary SQL/HTTP tools, remote schema references, or secret values.
+Target metadata is not probed or resolved during registration or preview.
+
+A board starts from one selected published scenario revision and pins its exact
+scenario and asset inputs. Its proposed operations are configured explicitly,
+separately from the authoring graph. Saving a board uses conditional writes;
+preview freezes its saved version and referenced configurations into a
+server-digested immutable manifest. Editing a scenario draft or uploading another
+asset version does not change an existing board.
+
+Static validation checks types, references, bounded flow and policy metadata.
+Readiness findings distinguish missing inputs from live checks not performed.
+Nonproduction labels do not prove authorization, isolation, connectivity, or
+effective target permissions. Production/unclassified targets remain ineligible.
+Before execution exists, the board reports disabled execution and no execution
+evidence, not a simulated run or invented assessment.
+
+Preparation approval pins the exact preview and digest, reviewer, explicit
+expiry, and acknowledgement of unverified prerequisites. Current workspace
+access, explicit approver grant, contributor history, configuration withdrawal,
+and board version determine its current validity. Old snapshots and decisions
+remain auditable; resolving missing information changes the manifest and requires
+a new review.
+
+Preparation and future execution manifests are separate contracts. No feature
+switch promotes one into the other. Actual execution requires complete approved
+targets, a fresh execution approval, dispatch-time authorization, and a separately
+versioned durable orchestration/outbox. The existing `plan_v1` remains planning
+only.
 
 ## Durable planning
 

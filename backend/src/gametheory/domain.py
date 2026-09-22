@@ -155,6 +155,11 @@ class WorkspaceView(Contract):
     role: Role
 
 
+class MeView(Contract):
+    object_id: str
+    organization_admin: bool
+
+
 class CommentInput(Contract):
     body: str = Field(min_length=1, max_length=5000)
     base_version: int = Field(ge=1)

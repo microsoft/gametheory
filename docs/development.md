@@ -140,6 +140,7 @@ backend/.venv/bin/ruff check backend/src backend/tests backend/migrations
 backend/.venv/bin/mypy --config-file backend/pyproject.toml backend/src
 backend/.venv/bin/pytest -q backend/tests
 backend/.venv/bin/gametheory openapi
+backend/.venv/bin/gametheory preparation-schemas
 npm run contracts
 npm test
 npm run build
@@ -160,3 +161,29 @@ The real Blob test starts Azurite. The CI job supplies real SQL Server and Sched
 emulator services and runs the same application worker with a test-only model fixture.
 Live Entra sign-in, managed identity/RBAC, and Foundry inference require separate
 authorized deployment validation.
+
+## Preparation and external exercise systems
+
+The ordinary application UI creates inventory, registers restricted operation
+descriptions, publishes scenarios, and prepares boards. Use
+[the preparation contract](preparation-contracts.md) when developing another
+external system. A registered catalog is data, not executable code; the API does
+not fetch its targets or turn it into model tools.
+
+Existing inventory is unverified. An organization administrator configures target
+metadata and explicit workspace approvers. A separate non-contributor reviewer
+may approve a preparation snapshot, but execution remains unavailable even when
+the preparation has been approved.
+
+The [independent flood lab](../exercises/flood-response/README.md) has its own
+dependencies, database migrations, identity settings, tests, and runtime. Follow
+its instructions separately; do not point it at `GT_SQL_URL` or include its code
+in the application image. Its operation catalogs and scenario files are created
+with code, then registered/uploaded through the normal UI. Do not seed Game
+Theory with application-database inserts or a scenario-specific setup endpoint.
+
+Use a dedicated disposable database for each suite. A supported Linux SQL Server
+host or explicitly approved SQL test host is required for database integration;
+SQLite and browser fixtures are not substitutes. No local command authorizes
+creating Azure resources, changing permissions, sending mail, or deploying the
+exercise system.

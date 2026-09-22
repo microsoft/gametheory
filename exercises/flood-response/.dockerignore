@@ -1,0 +1,11 @@
+.git
+.env
+.venv
+.local
+**/__pycache__
+.pytest_cache
+.ruff_cache
+ui/node_modules
+ui/dist
+ui/test-results
+ui/playwright-report

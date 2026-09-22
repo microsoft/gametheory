@@ -24,6 +24,23 @@ def test_runtime_grants_use_client_sid_and_keep_immutable_tables_read_insert_onl
     assert API_PERMISSIONS["revisions"] == API_PERMISSIONS["audit"] == "SELECT, INSERT"
     assert WORKER_PERMISSIONS["audit"] == "INSERT"
     assert WORKER_PERMISSIONS["scenarios"] == "SELECT"
+    for table in (
+        "connection_configurations",
+        "configuration_withdrawals",
+        "workspace_approver_grants",
+        "approver_grant_revocations",
+        "board_origins",
+        "board_contributors",
+        "board_previews",
+        "board_approvals",
+        "approval_revocations",
+    ):
+        assert API_PERMISSIONS[table] == "SELECT, INSERT"
+        assert table not in WORKER_PERMISSIONS
+    assert API_PERMISSIONS["boards"] == "SELECT, INSERT, UPDATE"
+    assert "preparation_collections" not in API_PERMISSIONS
+    assert "preparation_collections" not in WORKER_PERMISSIONS
+    assert "boards" not in WORKER_PERMISSIONS
     assert not any("ALTER" in statement or "CONTROL" in statement for statement in statements)
 
 

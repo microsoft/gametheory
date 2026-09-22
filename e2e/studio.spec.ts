@@ -13,7 +13,7 @@ async function fixture(page: Page, withImage = false) {
     updated_at: '2026-01-01T00:00:00Z',
     content: {
       schema_version: 1,
-      title: 'Regional flood response',
+      title: 'Service continuity review',
       document: {
         type: 'doc',
         content: [
@@ -45,9 +45,9 @@ async function fixture(page: Page, withImage = false) {
       nodes: [
         {
           id: nodeId,
-          label: 'Occupancy above 85%',
+          label: 'Queue utilization above 85%',
           kind: 'condition',
-          detail: 'Check the approved occupancy threshold.',
+          detail: 'Check the proposed queue utilization threshold.',
           position: { x: 100, y: 100 },
         },
       ],
@@ -96,7 +96,7 @@ async function fixture(page: Page, withImage = false) {
     }
     if (path.endsWith('/assets')) return fulfill(assets)
     if (path === '/api/workspaces')
-      return fulfill([{ id: wid, name: 'Regional resilience', role: 'owner' }])
+      return fulfill([{ id: wid, name: 'Service operations', role: 'owner' }])
     if (
       path === '/api/environments' ||
       path.endsWith('/assets') ||
@@ -109,7 +109,7 @@ async function fixture(page: Page, withImage = false) {
     if (path.endsWith('/planning') && method === 'POST') {
       const input = route.request().postDataJSON()
       const proposed = structuredClone(scenario.content)
-      proposed.title = 'Coordinated flood response'
+      proposed.title = 'Coordinated service recovery'
       requests = [
         ...requests,
         {
@@ -184,10 +184,10 @@ test('preserves input across focused editors and reloads saved content', async (
   await page.getByLabel('Scenario title').fill('Updated regional scenario')
   await page.getByLabel('Planning message').fill('Keep this unfinished question')
   await page.getByRole('button', { name: 'Flow', exact: true }).click()
-  await page.getByText('Occupancy above 85%', { exact: true }).click()
-  await page.getByLabel('Label', { exact: true }).fill('Occupancy above 80%')
+  await page.getByText('Queue utilization above 85%', { exact: true }).click()
+  await page.getByLabel('Label', { exact: true }).fill('Queue utilization above 80%')
   await page.getByText('Generated Mermaid source').click()
-  await expect(page.getByTestId('mermaid-source')).toContainText('Occupancy above 80#37;')
+  await expect(page.getByTestId('mermaid-source')).toContainText('Queue utilization above 80#37;')
   await page.getByRole('button', { name: 'Plan', exact: true }).click()
   await expect(page.getByLabel('Scenario title')).toHaveValue('Updated regional scenario')
   await expect(page.getByLabel('Planning message')).toHaveValue('Keep this unfinished question')
@@ -196,7 +196,7 @@ test('preserves input across focused editors and reloads saved content', async (
   await page.getByLabel('Planning message').fill('')
   await page.reload()
   await expect(page.getByLabel('Scenario title')).toHaveValue('Updated regional scenario')
-  await expect(page.getByText('Occupancy above 80%', { exact: true })).toHaveCount(2)
+  await expect(page.getByText('Queue utilization above 80%', { exact: true })).toHaveCount(2)
 })
 
 test('keeps local draft on conflicts and failed saves', async ({ page }) => {
@@ -220,13 +220,13 @@ test('proposal application is explicit and stale updates stay blocked', async ({
   await page.getByRole('button', { name: 'Request proposal' }).click()
   await page.getByRole('button', { name: 'Review proposed changes' }).click()
   await expect(
-    page.getByRole('heading', { name: 'Regional flood response', exact: true }),
+    page.getByRole('heading', { name: 'Service continuity review', exact: true }),
   ).toBeVisible()
   server.changeServer()
   await page.getByRole('button', { name: 'Apply reviewed proposal' }).click()
   await expect(page.getByRole('alert')).toContainText('stale')
   await expect(
-    page.getByRole('heading', { name: 'Regional flood response', exact: true }),
+    page.getByRole('heading', { name: 'Service continuity review', exact: true }),
   ).toBeVisible()
 })
 
@@ -237,7 +237,7 @@ test('accepted proposal updates the real studio state', async ({ page }) => {
   await page.getByRole('button', { name: 'Request proposal' }).click()
   await page.getByRole('button', { name: 'Review proposed changes' }).click()
   await page.getByRole('button', { name: 'Apply reviewed proposal' }).click()
-  await expect(page.getByLabel('Scenario title')).toHaveValue('Coordinated flood response')
+  await expect(page.getByLabel('Scenario title')).toHaveValue('Coordinated service recovery')
   await expect(page.getByText('Proposal applied and saved as a new draft version.')).toBeVisible()
 })
 
@@ -245,7 +245,7 @@ test('leaving unsaved work requires an explicit decision', async ({ page }) => {
   await fixture(page)
   await page.goto('/test.html')
   await page.getByLabel('Scenario title').fill('Do not lose this')
-  await page.getByRole('link', { name: 'Regional resilience' }).click()
+  await page.getByRole('link', { name: 'Service operations' }).click()
   await expect(page.getByRole('alertdialog')).toBeVisible()
   await page.getByRole('button', { name: 'Keep editing' }).click()
   await expect(page.getByLabel('Scenario title')).toHaveValue('Do not lose this')

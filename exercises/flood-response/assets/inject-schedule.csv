@@ -1,0 +1,2 @@
+profile,offset_seconds,shelter_key,operation,occupancy,label
+demonstration/v1,0,aster-reach,shelter.occupancy.update,108,EXERCISE ONLY; planned time is not evidence; capture committed event

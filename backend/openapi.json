@@ -57,9 +57,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Me Api Me Get"
+                  "$ref": "#/components/schemas/MeView"
                 }
               }
             }
@@ -1393,10 +1391,1606 @@
           }
         }
       }
+    },
+    "/api/workspaces/{wid}/connections/{cid}/configurations": {
+      "get": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Configurations",
+        "operationId": "configurations_api_workspaces__wid__connections__cid__configurations_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Cid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConfigurationView"
+                  },
+                  "title": "Response Configurations Api Workspaces  Wid  Connections  Cid  Configurations Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Register Configuration",
+        "operationId": "register_configuration_api_workspaces__wid__connections__cid__configurations_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Cid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionConfiguration"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/connections/{cid}/configurations/{config_id}/withdraw": {
+      "post": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Withdraw Configuration",
+        "operationId": "withdraw_configuration_api_workspaces__wid__connections__cid__configurations__config_id__withdraw_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "cid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Cid"
+            }
+          },
+          {
+            "name": "config_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Config Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/approvers": {
+      "get": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Approvers",
+        "operationId": "approvers_api_workspaces__wid__approvers_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApproverGrantView"
+                  },
+                  "title": "Response Approvers Api Workspaces  Wid  Approvers Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Grant Approver",
+        "operationId": "grant_approver_api_workspaces__wid__approvers_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproverGrantInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApproverGrantView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/approvers/{object_id}": {
+      "delete": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Revoke Approver",
+        "operationId": "revoke_approver_api_workspaces__wid__approvers__object_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "object_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Object Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/boards": {
+      "get": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Boards",
+        "operationId": "boards_api_workspaces__wid__boards_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BoardSummary"
+                  },
+                  "title": "Response Boards Api Workspaces  Wid  Boards Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Create Board",
+        "operationId": "create_board_api_workspaces__wid__boards_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/boards/{bid}": {
+      "get": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Board",
+        "operationId": "board_api_workspaces__wid__boards__bid__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Save Board",
+        "operationId": "save_board_api_workspaces__wid__boards__bid__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardDraft"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/boards/{bid}/previews": {
+      "post": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Freeze Preview",
+        "operationId": "freeze_preview_api_workspaces__wid__boards__bid__previews_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparationPreviewView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Previews",
+        "operationId": "previews_api_workspaces__wid__boards__bid__previews_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PreparationPreviewView"
+                  },
+                  "title": "Response Previews Api Workspaces  Wid  Boards  Bid  Previews Get"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/boards/{bid}/approvals": {
+      "post": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Decide Preparation",
+        "operationId": "decide_preparation_api_workspaces__wid__boards__bid__approvals_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreparationApprovalInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparationApprovalView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Approvals",
+        "operationId": "approvals_api_workspaces__wid__boards__bid__approvals_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PreparationApprovalView"
+                  },
+                  "title": "Response Approvals Api Workspaces  Wid  Boards  Bid  Approvals Get"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/boards/{bid}/approvals/{approval_id}/revoke": {
+      "post": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Revoke Approval",
+        "operationId": "revoke_approval_api_workspaces__wid__boards__bid__approvals__approval_id__revoke_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bid"
+            }
+          },
+          {
+            "name": "approval_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Approval Id"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparationApprovalView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/boards/{bid}/execute": {
+      "post": {
+        "tags": [
+          "Preparation"
+        ],
+        "summary": "Execute Disabled",
+        "operationId": "execute_disabled_api_workspaces__wid__boards__bid__execute_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "responses": {
+          "501": {
+            "description": "Execution is permanently disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionDisabled"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ApprovalValidity": {
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "valid",
+          "reasons"
+        ],
+        "title": "ApprovalValidity"
+      },
+      "ApproverGrantInput": {
+        "properties": {
+          "object_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Object Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "object_id"
+        ],
+        "title": "ApproverGrantInput"
+      },
+      "ApproverGrantView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "object_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Object Id"
+          },
+          "granted_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Granted By"
+          },
+          "granted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Granted At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "workspace_id",
+          "object_id",
+          "granted_by",
+          "granted_at"
+        ],
+        "title": "ApproverGrantView"
+      },
+      "AssetPin": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Name"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Sha256"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "media_type",
+          "sha256",
+          "size"
+        ],
+        "title": "AssetPin"
+      },
+      "BoardCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Name"
+          },
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Id"
+          },
+          "revision_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "scenario_id",
+          "revision_version"
+        ],
+        "title": "BoardCreate"
+      },
+      "BoardDraft": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "exercise-preparation-draft/v1",
+            "title": "Schema Version",
+            "default": "exercise-preparation-draft/v1"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Name"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/PreparationStep"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Steps"
+          },
+          "window": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreparationWindow"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notification_budget": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Notification Budget",
+            "default": 0
+          },
+          "recovery": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Recovery",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "BoardDraft"
+      },
+      "BoardSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Name"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Id"
+          },
+          "revision_version": {
+            "type": "integer",
+            "title": "Revision Version"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "preparation_status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "previewed"
+            ],
+            "title": "Preparation Status"
+          },
+          "approval_status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "approved",
+              "rejected",
+              "invalid"
+            ],
+            "title": "Approval Status"
+          },
+          "execution_authorized": {
+            "type": "boolean",
+            "const": false,
+            "title": "Execution Authorized",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "workspace_id",
+          "name",
+          "version",
+          "scenario_id",
+          "revision_version",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "preparation_status",
+          "approval_status"
+        ],
+        "title": "BoardSummary"
+      },
+      "BoardView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Name"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Id"
+          },
+          "revision_version": {
+            "type": "integer",
+            "title": "Revision Version"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "preparation_status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "previewed"
+            ],
+            "title": "Preparation Status"
+          },
+          "approval_status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "approved",
+              "rejected",
+              "invalid"
+            ],
+            "title": "Approval Status"
+          },
+          "execution_authorized": {
+            "type": "boolean",
+            "const": false,
+            "title": "Execution Authorized",
+            "default": false
+          },
+          "draft": {
+            "$ref": "#/components/schemas/BoardDraft"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/ScenarioPin"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetPin"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
+          "contributors": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Contributors"
+          },
+          "latest_preview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreparationPreviewView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "current_approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PreparationApprovalView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "can_edit": {
+            "type": "boolean",
+            "title": "Can Edit"
+          },
+          "can_approve": {
+            "type": "boolean",
+            "title": "Can Approve"
+          },
+          "approval_blockers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Approval Blockers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "workspace_id",
+          "name",
+          "version",
+          "scenario_id",
+          "revision_version",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "preparation_status",
+          "approval_status",
+          "draft",
+          "scenario",
+          "assets",
+          "contributors",
+          "latest_preview",
+          "current_approval",
+          "can_edit",
+          "can_approve",
+          "approval_blockers"
+        ],
+        "title": "BoardView"
+      },
       "Body_upload_asset_api_workspaces__wid__assets_post": {
         "properties": {
           "file": {
@@ -1432,6 +3026,299 @@
           "base_version"
         ],
         "title": "CommentInput"
+      },
+      "ConfigurationSnapshot": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "connection_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Connection Id"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "content": {
+            "$ref": "#/components/schemas/ConnectionConfiguration"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Digest"
+          },
+          "connection_kind": {
+            "type": "string",
+            "enum": [
+              "sql",
+              "rest",
+              "graph"
+            ],
+            "title": "Connection Kind"
+          },
+          "connection_name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Connection Name"
+          },
+          "environment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Environment Id"
+          },
+          "environment_name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Environment Name"
+          },
+          "template_asset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssetPin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "execution_authorized": {
+            "type": "boolean",
+            "const": false,
+            "title": "Execution Authorized",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "workspace_id",
+          "connection_id",
+          "version",
+          "content",
+          "digest",
+          "connection_kind",
+          "connection_name",
+          "environment_id",
+          "environment_name",
+          "created_by",
+          "created_at"
+        ],
+        "title": "ConfigurationSnapshot"
+      },
+      "ConfigurationView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "connection_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Connection Id"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Version"
+          },
+          "content": {
+            "$ref": "#/components/schemas/ConnectionConfiguration"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Digest"
+          },
+          "connection_kind": {
+            "type": "string",
+            "enum": [
+              "sql",
+              "rest",
+              "graph"
+            ],
+            "title": "Connection Kind"
+          },
+          "connection_name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Connection Name"
+          },
+          "environment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Environment Id"
+          },
+          "environment_name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Environment Name"
+          },
+          "template_asset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssetPin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "execution_authorized": {
+            "type": "boolean",
+            "const": false,
+            "title": "Execution Authorized",
+            "default": false
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At"
+          },
+          "withdrawn_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn By"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "workspace_id",
+          "connection_id",
+          "version",
+          "content",
+          "digest",
+          "connection_kind",
+          "connection_name",
+          "environment_id",
+          "environment_name",
+          "created_by",
+          "created_at"
+        ],
+        "title": "ConfigurationView"
+      },
+      "ConnectionConfiguration": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "connection-configuration/v1",
+            "title": "Schema Version",
+            "default": "connection-configuration/v1"
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "nonproduction",
+              "production"
+            ],
+            "title": "Classification",
+            "default": "unknown"
+          },
+          "resource_id": {
+            "type": "string",
+            "maxLength": 512,
+            "title": "Resource Id",
+            "default": ""
+          },
+          "endpoint": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Endpoint",
+            "default": ""
+          },
+          "database": {
+            "type": "string",
+            "maxLength": 128,
+            "title": "Database",
+            "default": ""
+          },
+          "identity_ref": {
+            "type": "string",
+            "maxLength": 512,
+            "title": "Identity Ref",
+            "default": ""
+          },
+          "catalog": {
+            "$ref": "#/components/schemas/OperationCatalog"
+          },
+          "notification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NotificationConfiguration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "catalog"
+        ],
+        "title": "ConnectionConfiguration"
       },
       "ConnectionInput": {
         "properties": {
@@ -1491,6 +3378,30 @@
           "environment_id"
         ],
         "title": "ConnectionInput"
+      },
+      "ExecutionDisabled": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "const": "execution_disabled",
+            "title": "Code",
+            "default": "execution_disabled"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Execution is disabled. Preparation approval is not authorization to execute."
+          },
+          "execution_authorized": {
+            "type": "boolean",
+            "const": false,
+            "title": "Execution Authorized",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ExecutionDisabled"
       },
       "FlowEdge": {
         "properties": {
@@ -1593,6 +3504,27 @@
         ],
         "title": "FlowNode"
       },
+      "GraphInvocation": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "graph",
+            "title": "Kind"
+          },
+          "template_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,79}$",
+            "title": "Template Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "template_key"
+        ],
+        "title": "GraphInvocation"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1607,6 +3539,25 @@
         "title": "HTTPValidationError"
       },
       "JsonValue": {},
+      "MeView": {
+        "properties": {
+          "object_id": {
+            "type": "string",
+            "title": "Object Id"
+          },
+          "organization_admin": {
+            "type": "boolean",
+            "title": "Organization Admin"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "object_id",
+          "organization_admin"
+        ],
+        "title": "MeView"
+      },
       "MembershipInput": {
         "properties": {
           "object_id": {
@@ -1649,6 +3600,46 @@
         ],
         "title": "Named"
       },
+      "NotificationConfiguration": {
+        "properties": {
+          "template_asset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Asset Id"
+          },
+          "sender": {
+            "type": "string",
+            "maxLength": 254,
+            "title": "Sender",
+            "default": ""
+          },
+          "recipients": {
+            "items": {
+              "type": "string",
+              "maxLength": 254
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Recipients"
+          },
+          "trusted_link": {
+            "type": "string",
+            "maxLength": 1000,
+            "title": "Trusted Link",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "NotificationConfiguration"
+      },
       "Objective": {
         "properties": {
           "id": {
@@ -1678,6 +3669,244 @@
           "criterion"
         ],
         "title": "Objective"
+      },
+      "OperationBinding": {
+        "properties": {
+          "configuration_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Configuration Id"
+          },
+          "operation_key": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,79}$",
+            "title": "Operation Key"
+          },
+          "operation_version": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,31}$",
+            "title": "Operation Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "configuration_id",
+          "operation_key",
+          "operation_version"
+        ],
+        "title": "OperationBinding"
+      },
+      "OperationCatalog": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "operation-catalog/v1",
+            "title": "Schema Version",
+            "default": "operation-catalog/v1"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Name"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/OperationDefinition"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Operations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "operations"
+        ],
+        "title": "OperationCatalog"
+      },
+      "OperationDefinition": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,79}$",
+            "title": "Key"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,31}$",
+            "title": "Version"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Label"
+          },
+          "effect": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write",
+              "notify"
+            ],
+            "title": "Effect"
+          },
+          "invocation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SqlInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/RestInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/GraphInvocation"
+              }
+            ],
+            "title": "Invocation",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "graph": "#/components/schemas/GraphInvocation",
+                "rest": "#/components/schemas/RestInvocation",
+                "sql": "#/components/schemas/SqlInvocation"
+              }
+            }
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/OperationField"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Parameters"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/OperationField"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Results"
+          },
+          "recovery": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Recovery"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "version",
+          "label",
+          "effect",
+          "invocation",
+          "parameters",
+          "results",
+          "recovery"
+        ],
+        "title": "OperationDefinition"
+      },
+      "OperationField": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "string",
+              "integer",
+              "number",
+              "boolean",
+              "uuid",
+              "datetime"
+            ],
+            "title": "Type"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "default": true
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "max_length": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4000.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Length"
+          },
+          "choices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 4000
+                },
+                "type": "array",
+                "maxItems": 100,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choices"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "OperationField"
       },
       "PlanningInput": {
         "properties": {
@@ -1729,6 +3958,557 @@
           "y"
         ],
         "title": "Position"
+      },
+      "PreparationApprovalInput": {
+        "properties": {
+          "preview_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Preview Id"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Digest"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "title": "Decision"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "acknowledge_unverified": {
+            "type": "boolean",
+            "const": true,
+            "title": "Acknowledge Unverified"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "preview_id",
+          "digest",
+          "decision",
+          "expires_at",
+          "acknowledge_unverified"
+        ],
+        "title": "PreparationApprovalInput"
+      },
+      "PreparationApprovalView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "board_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Board Id"
+          },
+          "board_version": {
+            "type": "integer",
+            "title": "Board Version"
+          },
+          "preview_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Preview Id"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Digest"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "kind": {
+            "type": "string",
+            "const": "preparation",
+            "title": "Kind",
+            "default": "preparation"
+          },
+          "execution_authorized": {
+            "type": "boolean",
+            "const": false,
+            "title": "Execution Authorized",
+            "default": false
+          },
+          "reviewer": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Reviewer"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "title": "Decision"
+          },
+          "acknowledge_unverified": {
+            "type": "boolean",
+            "const": true,
+            "title": "Acknowledge Unverified",
+            "default": true
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "validity": {
+            "$ref": "#/components/schemas/ApprovalValidity"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "revoked_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked By"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "board_id",
+          "board_version",
+          "preview_id",
+          "digest",
+          "sequence",
+          "reviewer",
+          "decision",
+          "expires_at",
+          "note",
+          "created_at",
+          "validity"
+        ],
+        "title": "PreparationApprovalView"
+      },
+      "PreparationFinding": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "blocker",
+              "warning",
+              "info"
+            ],
+            "title": "Severity"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "default": ""
+          },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "PreparationFinding"
+      },
+      "PreparationManifest": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "exercise-preparation/v1",
+            "title": "Schema Version",
+            "default": "exercise-preparation/v1"
+          },
+          "board_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Board Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "board_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Board Version"
+          },
+          "draft": {
+            "$ref": "#/components/schemas/BoardDraft"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/ScenarioPin"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetPin"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
+          "configurations": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigurationSnapshot"
+            },
+            "type": "array",
+            "title": "Configurations"
+          },
+          "execution_authorized": {
+            "type": "boolean",
+            "const": false,
+            "title": "Execution Authorized",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "board_id",
+          "workspace_id",
+          "board_version",
+          "draft",
+          "scenario",
+          "assets",
+          "configurations"
+        ],
+        "title": "PreparationManifest"
+      },
+      "PreparationPreviewView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "board_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Board Id"
+          },
+          "board_version": {
+            "type": "integer",
+            "title": "Board Version"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Digest"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/PreparationManifest"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/PreparationFinding"
+            },
+            "type": "array",
+            "title": "Findings"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current"
+          },
+          "execution_authorized": {
+            "type": "boolean",
+            "const": false,
+            "title": "Execution Authorized",
+            "default": false
+          },
+          "execution_eligible": {
+            "type": "boolean",
+            "const": false,
+            "title": "Execution Eligible",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "board_id",
+          "board_version",
+          "sequence",
+          "digest",
+          "manifest",
+          "findings",
+          "created_by",
+          "created_at",
+          "is_current"
+        ],
+        "title": "PreparationPreviewView"
+      },
+      "PreparationStep": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "operation",
+              "condition",
+              "wait"
+            ],
+            "title": "Kind"
+          },
+          "authoring_node_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authoring Node Id"
+          },
+          "depends_on": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Depends On"
+          },
+          "binding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationBinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parameters": {
+            "patternProperties": {
+              "^[A-Za-z_][A-Za-z0-9_]{0,63}$": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PriorResultReference"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "type": "object",
+            "maxProperties": 100,
+            "title": "Parameters"
+          },
+          "wait_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 86400.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wait Seconds"
+          },
+          "condition": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StepCondition"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "kind"
+        ],
+        "title": "PreparationStep"
+      },
+      "PreparationWindow": {
+        "properties": {
+          "starts_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Starts At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "starts_at",
+          "ends_at"
+        ],
+        "title": "PreparationWindow"
+      },
+      "PriorResultReference": {
+        "properties": {
+          "source_step_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Step Id"
+          },
+          "field": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+            "title": "Field"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_step_id",
+          "field"
+        ],
+        "title": "PriorResultReference",
+        "description": "A required declared result of a guaranteed earlier operation; never evaluated here."
+      },
+      "RestInvocation": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "rest",
+            "title": "Kind"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ],
+            "title": "Method"
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Path"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "method",
+          "path"
+        ],
+        "title": "RestInvocation",
+        "description": "Description only: expected_version maps to future strong If-Match.\n\nIt is a string with explicit max_length and a bare, unquoted opaque value.\nThe future dispatcher owns Idempotency-Key; catalogs cannot supply headers.\nRemaining non-path parameters are GET query fields or a flat write body."
       },
       "ScenarioContent": {
         "properties": {
@@ -1793,6 +4573,31 @@
         ],
         "title": "ScenarioContent"
       },
+      "ScenarioPin": {
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scenario Id"
+          },
+          "revision_version": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Revision Version"
+          },
+          "content": {
+            "$ref": "#/components/schemas/ScenarioContent"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "revision_version",
+          "content"
+        ],
+        "title": "ScenarioPin"
+      },
       "ScenarioView": {
         "properties": {
           "id": {
@@ -1825,6 +4630,98 @@
           "updated_at"
         ],
         "title": "ScenarioView"
+      },
+      "SqlInvocation": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "sql",
+            "title": "Kind"
+          },
+          "procedure": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}\\.[A-Za-z_][A-Za-z0-9_]{0,127}$",
+            "title": "Procedure"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "procedure"
+        ],
+        "title": "SqlInvocation"
+      },
+      "StepCondition": {
+        "properties": {
+          "source_step_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Source Step Id"
+          },
+          "result_field": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+            "title": "Result Field"
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "eq",
+              "ne",
+              "gt",
+              "gte",
+              "lt",
+              "lte"
+            ],
+            "title": "Operator"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "title": "Value"
+          },
+          "if_true": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "If True"
+          },
+          "if_false": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "If False"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_step_id",
+          "result_field",
+          "operator",
+          "value"
+        ],
+        "title": "StepCondition"
       },
       "ValidationError": {
         "properties": {

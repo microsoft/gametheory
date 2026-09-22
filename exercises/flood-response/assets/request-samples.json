@@ -1,0 +1,17 @@
+{
+  "synthetic": true,
+  "label": "EXERCISE ONLY — substitute an authorized run shelter and future UTC time",
+  "required_headers": [
+    "Authorization",
+    "Idempotency-Key"
+  ],
+  "requests": [
+    {
+      "shelter_id": "20dd93bf-5370-5807-98b0-29e5bc174316",
+      "resource_type": "cots",
+      "quantity_requested": 24,
+      "summary": "EXERCISE ONLY — additional cots for Aster Reach School",
+      "needed_by": "2030-01-15T10:20:00Z"
+    }
+  ]
+}

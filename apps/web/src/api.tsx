@@ -37,6 +37,18 @@ export function createApi(token: () => Promise<string>) {
     async get<T>(path: string): Promise<T> {
       return (await response(path)).json()
     },
+    async read<T>(path: string): Promise<{ data: T; version: number }> {
+      const result = await response(path)
+      const etag = result.headers.get('ETag')
+      if (!etag || !/^"(0|[1-9]\d*)"$/.test(etag))
+        throw new Error(
+          'The service did not provide a strong version. Reload before making changes.',
+        )
+      const version = Number(etag.slice(1, -1))
+      if (!Number.isSafeInteger(version))
+        throw new Error('The service returned an invalid version. Changes are unavailable.')
+      return { data: await result.json(), version }
+    },
     async send<T>(path: string, method: string, body?: unknown, version?: number): Promise<T> {
       const result = await response(path, {
         method,

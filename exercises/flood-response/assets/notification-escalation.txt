@@ -1,0 +1,13 @@
+Subject: EXERCISE ONLY — synthetic resource request (escalation)
+
+EXERCISE ONLY. This is fictional training material, not a real emergency.
+Template: flood-escalation-v1. Graph sending is absent and disabled.
+
+Run: {{run_id}}
+Request: {{request_id}}
+Please review the synthetic request in the authorized operational application.
+Trusted operational link: {{trusted_link}}
+
+Sender and recipient allowlist remain unresolved until explicitly configured.
+Budget: one initial notification and at most one escalation; two total.
+Do not initiate real-world dispatch or infer receipt from this template.

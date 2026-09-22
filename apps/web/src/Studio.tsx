@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useBlocker, useParams } from 'react-router-dom'
 import {
@@ -27,6 +27,7 @@ import type {
   Workspace,
 } from './types'
 import { normalizeScenario } from './types'
+import { CreateBoardFromRevision, type BoardCreate } from './Boards'
 
 type Pane = 'document' | 'flow' | 'assets' | 'review' | 'history'
 
@@ -49,6 +50,16 @@ export function StudioContent({ wid, sid }: { wid: string; sid: string }) {
   const [review, setReview] = useState<Planning>()
   const [reviewBefore, setReviewBefore] = useState(false)
   const [notice, setNotice] = useState('')
+  const [boardInputs, setBoardInputs] = useState<Record<number, BoardCreate>>({})
+  const handleBoardInput = useCallback((revision: number, input: BoardCreate | null) => {
+    setBoardInputs((previous) => {
+      if (!input && !previous[revision]) return previous
+      const next = { ...previous }
+      if (input) next[revision] = input
+      else delete next[revision]
+      return next
+    })
+  }, [])
   const discardDialog = useRef<HTMLDialogElement>(null)
   const intent = useRef<{ id: string; prompt: string; version: number }>()
   const scenario = useQuery({
@@ -93,7 +104,8 @@ export function StudioContent({ wid, sid }: { wid: string; sid: string }) {
     }
   }, [scenario.data, base])
   const dirty = !!base && !!content && JSON.stringify(base.content) !== JSON.stringify(content)
-  const unsaved = dirty || !!prompt.trim() || !!comment.trim() || uploading
+  const unsaved =
+    dirty || !!prompt.trim() || !!comment.trim() || uploading || Object.keys(boardInputs).length > 0
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       unsaved && currentLocation.pathname !== nextLocation.pathname,
@@ -707,6 +719,17 @@ export function StudioContent({ wid, sid }: { wid: string; sid: string }) {
                     >
                       Download immutable snapshot
                     </button>
+                    {workspace?.role !== 'viewer' && workspace && (
+                      <CreateBoardFromRevision
+                        wid={wid}
+                        scenarioId={sid}
+                        revisionVersion={revision.version}
+                        title={revision.content.title}
+                        disabled={!editable}
+                        onInputChange={handleBoardInput}
+                        initialInput={boardInputs[revision.version]}
+                      />
+                    )}
                     <pre>{JSON.stringify(revision.content, null, 2)}</pre>
                   </details>
                 ))}
@@ -728,11 +751,27 @@ export function StudioContent({ wid, sid }: { wid: string; sid: string }) {
           }}
         >
           <h2 id="discard-heading">Leave unsaved work?</h2>
-          <p>Your unsaved plan, comment, or planning message will be discarded.</p>
+          <p>
+            Your unsaved plan, comment, planning message, or board creation input will be discarded.
+          </p>
           <div className="toolbar">
             <button autoFocus onClick={() => blocker.reset()}>
               Keep editing
             </button>
+            {Object.keys(boardInputs).length > 0 && (
+              <button
+                onClick={() =>
+                  download(
+                    new Blob([JSON.stringify(Object.values(boardInputs), null, 2)], {
+                      type: 'application/json',
+                    }),
+                    'board-creation-inputs.json',
+                  )
+                }
+              >
+                Export board creation input
+              </button>
+            )}
             <button className="danger" onClick={() => blocker.proceed()}>
               Discard and leave
             </button>

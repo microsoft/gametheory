@@ -64,9 +64,9 @@ def scenario_view(scenario: Scenario) -> ScenarioView:
     )
 
 
-def expected_version(value: str | None) -> int:
+def expected_version(value: str | None, resource: str = "draft") -> int:
     if value is None:
-        raise HTTPException(428, "Send the current draft ETag in If-Match")
+        raise HTTPException(428, f"Send the current {resource} ETag in If-Match")
     if not value.startswith('"') or not value.endswith('"') or not value[1:-1].isdigit():
         raise HTTPException(400, "If-Match must contain one strong numeric ETag")
     version = int(value[1:-1])
@@ -75,11 +75,26 @@ def expected_version(value: str | None) -> int:
     return version
 
 
-def connection_available(db: Session, connection: Connection, workspace_id: str) -> bool:
+def connection_available(
+    db: Session, connection: Connection, workspace_id: str, *, fence: bool = False
+) -> bool:
     if connection.scope == "organization":
         return True
     if connection.scope == "workspace":
         return connection.workspace_id == workspace_id
+    if fence:
+        return (
+            db.scalar(
+                select(ConnectionGrant)
+                .where(
+                    ConnectionGrant.connection_id == connection.id,
+                    ConnectionGrant.workspace_id == workspace_id,
+                )
+                .with_hint(ConnectionGrant, "WITH (HOLDLOCK)", dialect_name="mssql")
+                .execution_options(populate_existing=True)
+            )
+            is not None
+        )
     return db.get(ConnectionGrant, (connection.id, workspace_id)) is not None
 
 

@@ -1,0 +1,185 @@
+{
+  "schema_version": "operation-catalog/v1",
+  "name": "Synthetic flood lab — SQL descriptions",
+  "operations": [
+    {
+      "key": "shelter.occupancy.read",
+      "version": "2",
+      "label": "Read exercise shelter occupancy",
+      "effect": "read",
+      "invocation": {
+        "kind": "sql",
+        "procedure": "flood.ReadOccupancy"
+      },
+      "parameters": [
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "shelter_id",
+          "type": "uuid",
+          "required": true
+        }
+      ],
+      "results": [
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "shelter_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "occupancy",
+          "type": "integer",
+          "required": true,
+          "minimum": 0,
+          "maximum": 100000
+        },
+        {
+          "name": "capacity",
+          "type": "integer",
+          "required": true,
+          "minimum": 1,
+          "maximum": 100000
+        },
+        {
+          "name": "record_version",
+          "type": "string",
+          "required": true,
+          "max_length": 37
+        },
+        {
+          "name": "occupancy_percent",
+          "type": "number",
+          "required": true,
+          "minimum": 0,
+          "maximum": 100
+        },
+        {
+          "name": "durable_event_id",
+          "type": "uuid",
+          "required": false
+        },
+        {
+          "name": "committed_at",
+          "type": "datetime",
+          "required": false
+        }
+      ],
+      "recovery": "Read-only. SQL observer/injector role and a current SQL principal/run grant required. Compare occupancy_percent > 85 directly; no formula is required. Missing matching event ID or UTC timestamp means indeterminate timing, not an invented event or participant failure."
+    },
+    {
+      "key": "shelter.occupancy.update",
+      "version": "2",
+      "label": "Inject synthetic occupancy",
+      "effect": "write",
+      "invocation": {
+        "kind": "sql",
+        "procedure": "flood.UpdateOccupancy"
+      },
+      "parameters": [
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "shelter_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "occupancy",
+          "type": "integer",
+          "required": true,
+          "minimum": 0,
+          "maximum": 100000
+        },
+        {
+          "name": "expected_version",
+          "type": "string",
+          "required": true,
+          "max_length": 37
+        },
+        {
+          "name": "idempotency_key",
+          "type": "string",
+          "required": true,
+          "max_length": 128
+        }
+      ],
+      "results": [
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "shelter_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "occupancy",
+          "type": "integer",
+          "required": true,
+          "minimum": 0,
+          "maximum": 100000
+        },
+        {
+          "name": "capacity",
+          "type": "integer",
+          "required": true,
+          "minimum": 1,
+          "maximum": 100000
+        },
+        {
+          "name": "record_version",
+          "type": "string",
+          "required": true,
+          "max_length": 37
+        },
+        {
+          "name": "occupancy_percent",
+          "type": "number",
+          "required": false,
+          "minimum": 0,
+          "maximum": 100
+        },
+        {
+          "name": "outcome",
+          "type": "string",
+          "required": true,
+          "choices": [
+            "succeeded",
+            "rejected",
+            "failed",
+            "unknown"
+          ]
+        },
+        {
+          "name": "durable_event_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "committed_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "name": "correlation_id",
+          "type": "uuid",
+          "required": true
+        }
+      ],
+      "recovery": "No automatic undo. Reconcile unknown outcomes with the identical actor, run, operation, key, payload and expected version. Operator recovery retires only unchanged seed-owned records; participant changes, other operations and durable evidence are retained. Injector role only; participant SQL access is absent. New receipts persist occupancy_percent; replayed pre-upgrade receipts may omit it. Never recompute a replay from current shelter state."
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { InteractionRequiredAuthError, PublicClientApplication } from '@azure/msal-browser'
 import { MsalProvider, useMsal } from '@azure/msal-react'
 import { useQuery } from '@tanstack/react-query'
@@ -8,6 +8,15 @@ import { createApi, ErrorNotice, SessionContext } from './api'
 import type { Config } from './types'
 import { Library, WorkspacePage } from './Library'
 import { Studio } from './Studio'
+
+const PreparationBoard = lazy(() =>
+  import('./PreparationBoard').then((module) => ({ default: module.PreparationBoard })),
+)
+const ConnectionConfigurations = lazy(() =>
+  import('./ConnectionConfigurations').then((module) => ({
+    default: module.ConnectionConfigurations,
+  })),
+)
 
 export function ThemeButton() {
   const [dark, setDark] = useState(() => localStorage.getItem('gt-theme') === 'dark')
@@ -188,6 +197,34 @@ function Authenticated({ config }: { config: Config }) {
           <Route path="/" element={<Library />} />
           <Route path="/w/:wid" element={<WorkspacePage />} />
           <Route path="/w/:wid/s/:sid" element={<Studio />} />
+          <Route
+            path="/w/:wid/boards/:bid"
+            element={
+              <Suspense
+                fallback={
+                  <main className="page" role="status">
+                    Opening preparation board...
+                  </main>
+                }
+              >
+                <PreparationBoard />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/w/:wid/connections/:cid"
+            element={
+              <Suspense
+                fallback={
+                  <main className="page" role="status">
+                    Opening connection configuration...
+                  </main>
+                }
+              >
+                <ConnectionConfigurations />
+              </Suspense>
+            }
+          />
           <Route
             path="*"
             element={
