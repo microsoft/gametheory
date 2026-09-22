@@ -155,9 +155,10 @@ Pin/retain `plan_v1` workers for active histories when introducing incompatible
 orchestration changes. SQL migrations and application rollout require backward
 compatibility review. Test database backup/restore and asset retention independently.
 
-Production approvals, actual organizational-system writes, recovery/compensation,
-Foundry agent registration, optional Agent 365 integration, and multi-cloud
-validation are outside this milestone.
+Environment-based execution approvals and explicit recovery are implemented in
+the separate opt-in executor; see [execution.md](execution.md). Actual
+organizational-system writes, Foundry agent registration, optional Agent 365
+integration, and multi-cloud validation remain separate live deployment gates.
 
 ## Preparation schema rollout and exercise isolation
 
@@ -169,8 +170,8 @@ records as dispatch intents. Existing `plan_v1` instances and histories retain
 their original behavior.
 
 Registration of target metadata, environment classification, operation catalogs,
-or approver grants is not cloud authorization. The runtime still advertises
-execution as disabled. A preparation approval cannot become execution approval
+or approver grants is not cloud authorization. The runtime advertises
+execution as disabled by default. A preparation approval cannot become execution approval
 after a deployment or configuration change.
 
 The independent package in `exercises/flood-response/` has a separate deployment
@@ -180,6 +181,29 @@ SQL permissions, mailbox restrictions, recipients and resource budget require a
 new concrete resource proposal and explicit approval. Prior Game Theory deployment
 approval does not cover them. Do not run exercise migrations against the
 application database or alter private-network policy to make a preview pass.
+
+## Opt-in executor rollout
+
+Application migrations `0003` and `0004` add versioned environment policies and
+isolated run/authorization/evidence/outbox records. Apply them with the migration
+operator, then review the updated table-scoped API grants and optional separate
+executor principal. The planning worker retains its existing privileges and
+`plan_v1` histories.
+
+The `executor` Docker target starts `gametheory-executor`. It is not deployed by
+the existing greenfield template. An approved deployment must explicitly provide
+its own task hub, task-hub-scoped Scheduler grant, application SQL identity,
+allowlisted target identities, read-only target binding file, and network access.
+The API must receive the matching non-secret binding/runtime settings, but no
+external target identity grants. Record operator readiness receipts only after
+actual identity, connectivity, permission, and isolation checks.
+
+Production execution always requires independent approval in the application;
+an administrator cannot disable it. This rule does not itself authorize a real
+production deployment. Nonproduction approval is optional per environment, but
+target activation and runtime prerequisites are never optional. Validate the
+ordinary UI workflow, revocation/stop behavior, immutable history, recovery
+conflicts, and dependency failure before approving live use.
 
 ## Partial deployment and private dependency probes
 

@@ -1,7 +1,22 @@
 # Flood response pilot: product and exercise-environment handoff
 
-Status: **Preparation and independent-lab development selected; not deployment
-or execution authorization.**
+Status: **Application execution development selected; not deployment or live
+execution authorization.**
+
+Continuation update: the preparation/lab implementation and Linux dependency/
+SQL fixes are merged in #9. The next application increment adds administrator
+Settings, versioned environment policies, explicit execution capabilities, and a
+separate SQL/REST run engine. **Production always requires independent execution
+approval; admins choose which nonproduction environments require approval.**
+This decision supersedes the original pilot-only production prohibition for the
+new executable-v2 path, not for historical preparation records. The descriptions
+below record the original pilot context; [execution.md](execution.md) is the
+current implemented contract and its limitations.
+
+Graph sending, actual Azure deployment, approved target identities/resources,
+and the email-inclusive end-to-end exercise remain outstanding. The lab's
+operational UI and code-built assets remain external to Game Theory. No starter
+kit or product scenario seed has been introduced.
 
 The user proposed two coordinated tracks: extend Game Theory, and establish a
 controlled Azure environment containing databases, APIs, and Microsoft Graph
@@ -14,7 +29,7 @@ resources, identities, mailboxes, recipients, costs, and execution permissions
 remain unapproved. Do not interpret this document, earlier Game Theory deployment
 approval, or a published scenario as approval to modify those targets.
 
-The first increment is preparation-only: generic connection configuration,
+The completed first increment was preparation-only: generic connection configuration,
 pinned boards, static previews, and explicit independent approver grants with
 no self-approval. Preparation sign-off does not authorize execution, and a fresh
 execution approval will be required later. The external exercise has its own
@@ -25,7 +40,7 @@ templates, a starter kit, or a scenario installer. The user configures
 connections, registers external operation descriptions, uploads files, and
 authors the scenario and plan through the normal UI.
 [Generic preparation contracts](preparation-contracts.md) define that boundary.
-The end-to-end execution workflow below remains a later, separately gated goal.
+The email-inclusive end-to-end workflow below remains a separately gated goal.
 
 ## 1. Product intent and existing foundation
 
@@ -122,8 +137,10 @@ unrestricted HTTP calls, select unapproved recipients, or authorize execution.
 Validate execution semantics separately from the authoring graph. For this pilot,
 support a bounded acyclic flow; reject unsupported cycles and step types.
 
-Use a capability gate that remains off until the target configuration and live
-acceptance gates pass. Production-labelled connections remain ineligible.
+Use a capability gate that remains off until target configuration and live
+acceptance gates pass. The executable-v2 continuation requires production
+approval rather than banning all production-classified configurations; no actual
+production resource has been authorized.
 
 ### Track B: controlled exercise environment
 

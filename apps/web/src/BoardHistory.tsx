@@ -123,6 +123,11 @@ export function PreviewDetails({ preview }: { preview: Preview }) {
       </p>
       <h3>Server-computed SHA-256 digest</h3>
       <code className="preparation-digest">{preview.digest}</code>
+      <p className="preparation-note">
+        These immutable findings belong to the preparation-only contract. They never authorize a
+        run. The separate Exercise runs section evaluates current environment approval rules,
+        including mandatory production approval, and operator-verified target readiness.
+      </p>
       <section className="preparation-section">
         <h3>Missing inputs and static constraints</h3>
         {!staticFindings.length && (
@@ -152,8 +157,8 @@ export function PreviewDetails({ preview }: { preview: Preview }) {
         <h3>Unverified live prerequisites</h3>
         <p className="notice">
           Target contents, connectivity, target permissions, and notification delivery have not been
-          checked. Described IDs and labels are not evidence. Execution remains disabled regardless
-          of static findings or preparation approval.
+          checked by this preview. Described IDs and labels are not evidence. Execution through
+          preparation remains disabled regardless of static findings or preparation approval.
         </p>
         <ul className="preparation-list">
           {liveFindings.map((finding, index) => (

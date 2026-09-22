@@ -18,7 +18,7 @@ work in their everyday tools; Game Theory is the scenario-owner control plane.
 - Multi-team coordinated activities and exercises.
 - AI-assisted scenario execution and monitoring.
 
-## Current milestone: authoring and exercise preparation
+## Current milestone: authoring, preparation, and controlled runs
 
 The new document-first, mineral/ocean studio provides:
 
@@ -33,12 +33,18 @@ The new document-first, mineral/ocean studio provides:
   descriptions, without contacting the described targets.
 - Game boards pinned to published revisions, static preparation previews, and
   digest-bound preparation review by separately granted approvers.
+- An administrator Settings page for classified environments, execution policy,
+  and explicit operator/reviewer grants. Production approval is mandatory;
+  nonproduction approval is configurable and off by default.
+- A separate, opt-in SQL/REST executor with pinned runs, manual/scheduled starts,
+  pause/stop, durable evidence, objective findings, and explicit recovery.
 
-**This milestone does not execute exercises or write to connected organizational
-systems.** Publishing a revision, registering a connection, or approving a
+**Execution is disabled by default and requires separate deployment configuration
+and authorized target readiness.** Publishing a revision, registering a connection, or approving a
 preparation does not authorize execution. Preparation approval cannot later be
-promoted into execution approval. Connection configuration does not activate SQL,
-REST, Microsoft Graph, or MCP access.
+promoted into execution approval. Administrators configure environment policy;
+deployment operators separately authorize concrete targets and identities. Graph
+sending, MCP, and arbitrary SQL/HTTP execution remain unavailable.
 
 An [independent flood exercise system](exercises/flood-response/README.md) provides
 synthetic operational data, an API, a separate response UI, and scenario material.
@@ -62,6 +68,7 @@ simulated data.
 
 - [Architecture and behavioral contracts](docs/architecture.md)
 - [Generic preparation and operation contracts](docs/preparation-contracts.md)
+- [Environment policies and exercise execution](docs/execution.md)
 - [Commercial deployment preparation and validation gates](docs/deployment.md)
 - [Flood-response pilot and implementation handoff](docs/flood-response-pilot-plan.md)
 - [Security reporting](SECURITY.md)

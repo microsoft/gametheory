@@ -141,6 +141,7 @@ backend/.venv/bin/mypy --config-file backend/pyproject.toml backend/src
 backend/.venv/bin/pytest -q backend/tests
 backend/.venv/bin/gametheory openapi
 backend/.venv/bin/gametheory preparation-schemas
+backend/.venv/bin/gametheory execution-schemas
 npm run contracts
 npm test
 npm run build
@@ -164,6 +165,17 @@ authorized deployment validation.
 
 ## Preparation and external exercise systems
 
+Administrator environment settings and the separate opt-in run executor are
+documented in [execution.md](execution.md). Apply the additive policy/run
+migrations before using Settings. Existing environments start unclassified and
+execution-disabled; the administrator explicitly configures them. Production
+always requires independent execution approval; nonproduction does not by default.
+
+`gametheory-executor` runs separately from the planning worker, with its own task
+hub, SQL principal, and operator-maintained target bindings. The API uses the
+same non-secret binding configuration for authorization. Do not start it against
+organizational systems without the specific target/runtime approval.
+
 The ordinary application UI creates inventory, registers restricted operation
 descriptions, publishes scenarios, and prepares boards. Use
 [the preparation contract](preparation-contracts.md) when developing another
@@ -172,8 +184,8 @@ not fetch its targets or turn it into model tools.
 
 Existing inventory is unverified. An organization administrator configures target
 metadata and explicit workspace approvers. A separate non-contributor reviewer
-may approve a preparation snapshot, but execution remains unavailable even when
-the preparation has been approved.
+may approve a preparation snapshot, but that never authorizes execution. Only the
+separate run workflow can dispatch with configured runtime and current policy.
 
 The [independent flood lab](../exercises/flood-response/README.md) has its own
 dependencies, database migrations, identity settings, tests, and runtime. Follow

@@ -16,11 +16,61 @@ from gametheory.preparation import canonical_digest
 
 
 def execution_case(
-    sql_client, sql_factory, monkeypatch, tmp_path, classification="nonproduction", *, steps=None
+    sql_client,
+    sql_factory,
+    monkeypatch,
+    tmp_path,
+    classification="nonproduction",
+    *,
+    steps=None,
+    mutation=False,
+    recovery=False,
 ):
     client, actor = sql_client
     wid, workspace, _, _, board, board_path = published_board(client, "Execution integration")
     _, _, config = configuration(client, workspace, classification=classification)
+    if mutation:
+        content = json.loads(json.dumps(config["content"]))
+        operation = content["catalog"]["operations"][0]
+        operation["effect"] = "write"
+        operation["invocation"]["method"] = "POST"
+        operation["results"].extend(
+            [
+                {"name": "outcome", "type": "string", "required": True},
+                {"name": "durable_event_id", "type": "uuid", "required": True},
+                {"name": "committed_at", "type": "datetime", "required": True},
+                {"name": "run_id", "type": "uuid", "required": True},
+                {"name": "record_version", "type": "string", "required": True, "max_length": 100},
+            ]
+        )
+        content["catalog"]["operations"].append(
+            {
+                "key": "record.recover",
+                "version": "1",
+                "label": "Recover unchanged owned record",
+                "effect": "write",
+                "invocation": {"kind": "rest", "method": "DELETE", "path": "/records/{record_id}"},
+                "parameters": [
+                    {"name": "record_id", "type": "uuid", "required": True},
+                    {"name": "run_id", "type": "uuid", "required": True},
+                    {
+                        "name": "expected_version",
+                        "type": "string",
+                        "required": True,
+                        "max_length": 100,
+                    },
+                ],
+                "results": operation["results"],
+                "recovery": "Preserve version/ownership conflicts.",
+            }
+        )
+        config = require(
+            client.post(
+                workspace + f"/connections/{config['connection_id']}/configurations",
+                json=content,
+            ),
+            201,
+        )
     policy_path = f"/api/admin/environment-policies/{config['environment_id']}"
     require(
         client.put(
@@ -49,7 +99,6 @@ def execution_case(
         draft["steps"] = steps(draft["steps"])
     saved = require(client.put(board_path, json=draft, headers={"If-Match": '"1"'}))
     frozen = preview(client, board_path, saved["version"])
-    operation = config["content"]["catalog"]["operations"][0]
     target = TargetBinding(
         configuration_id=config["id"],
         configuration_digest=config["digest"],
@@ -60,7 +109,10 @@ def execution_case(
         identity_ref=config["content"]["identity_ref"],
         client_id=uuid4(),
         token_scope="api://fixture/.default",
-        operations=[AllowedOperation(digest=canonical_digest(operation), safe_replay=False)],
+        operations=[
+            AllowedOperation(digest=canonical_digest(item), safe_replay=False)
+            for item in config["content"]["catalog"]["operations"]
+        ],
     )
     path = tmp_path / f"bindings-{wid}.json"
     path.write_text(json.dumps([target.model_dump(mode="json")]))
@@ -89,6 +141,26 @@ def execution_case(
                 expires_at=now() + timedelta(hours=2),
             )
         )
+    recovery_bindings = []
+    if recovery:
+        sid = draft["steps"][0]["id"]
+        recovery_bindings = [
+            {
+                "step_id": sid,
+                "binding": {
+                    "configuration_id": config["id"],
+                    "operation_key": "record.recover",
+                    "operation_version": "1",
+                },
+                "parameters": {
+                    "record_id": draft["steps"][0]["parameters"]["record_id"],
+                    "run_id": {"source_step_id": sid, "field": "run_id"},
+                    "expected_version": {"source_step_id": sid, "field": "record_version"},
+                },
+                "ownership_parameter": "run_id",
+                "version_parameter": "expected_version",
+            }
+        ]
     run = require(
         client.post(
             board_path + "/runs",
@@ -96,6 +168,7 @@ def execution_case(
             json={
                 "preview_id": frozen["id"],
                 "preview_digest": frozen["digest"],
+                "recovery": recovery_bindings,
             },
         ),
         201,

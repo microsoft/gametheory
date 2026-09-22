@@ -40,7 +40,7 @@ export function Library() {
           </p>
         </div>
         <span className="badge">
-          <ShieldCheck size={16} /> Authoring only
+          <ShieldCheck size={16} /> Governed exercise control
         </span>
       </div>
       <ErrorNotice error={workspaces.error ?? me.error ?? create.error} />
@@ -366,6 +366,13 @@ function Connections({ wid, editable }: { wid: string; editable: boolean }) {
             Add to inventory
           </button>
         </form>
+      )}
+      {me.data?.organization_admin && (
+        <p className="notice">
+          Manage environment classifications and execution approval rules in{' '}
+          <Link to="/settings">Organization settings</Link>. Newly added environments are
+          unclassified and execution-disabled.
+        </p>
       )}
       {me.data?.organization_admin && (
         <form

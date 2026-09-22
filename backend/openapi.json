@@ -4719,6 +4719,7 @@
             "type": "string",
             "maxLength": 512,
             "minLength": 1,
+            "pattern": "^[A-Za-z0-9_./:@()+-]+$",
             "title": "Evidence Reference"
           },
           "note": {

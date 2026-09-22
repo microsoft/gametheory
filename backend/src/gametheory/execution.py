@@ -110,6 +110,10 @@ class RunCreate(Contract):
 
 
 def require_mutation_receipt(operation: OperationDefinition) -> None:
+    if operation.invocation.kind == "rest" and (operation.invocation.method == "GET") != (
+        operation.effect == "read"
+    ):
+        raise ValueError("Only GET can be a REST read; mutating methods require a write contract")
     if operation.effect != "write":
         return
     fields = {item.name: item for item in operation.results}
@@ -144,6 +148,11 @@ class RunManifest(Contract):
             raise ValueError("Execution needs operations and an explicit bounded window")
         if not prep.draft.recovery.strip():
             raise ValueError("Record a recovery decision before execution")
+        if (
+            sum(step.wait_seconds or 0 for step in prep.draft.steps)
+            > (prep.draft.window.ends_at - prep.draft.window.starts_at).total_seconds()
+        ):
+            raise ValueError("Fixed waits cannot exceed the execution window")
         for config in prep.configurations:
             content = config.content
             if config.connection_kind not in {"sql", "rest"}:
@@ -325,7 +334,9 @@ class RunControl(Contract):
 class ManualRecoveryInput(Contract):
     step_id: UUID
     phase: Phase = "recovery"
-    evidence_reference: str = Field(min_length=1, max_length=512)
+    evidence_reference: str = Field(
+        min_length=1, max_length=512, pattern=r"^[A-Za-z0-9_./:@()+-]+$"
+    )
     note: str = Field(min_length=1, max_length=2000)
 
 

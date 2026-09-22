@@ -124,7 +124,7 @@ export function ExecutionBoundary({
         Execution disabled
       </button>
       <span id="execution-boundary" className="sr-only">
-        This release cannot run exercises or write to connected systems.
+        This deployment has not enabled the separate exercise executor.
       </span>
     </div>
   )

@@ -372,7 +372,11 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
   const reviewChanged = !!reviewBase && reviewBase.version !== run.version
   const manualItems = run.steps.filter(
     (step) =>
-      step.state === 'manual_required' ||
+      (step.phase === 'recovery' &&
+        ['manual_required', 'rejected', 'failed', 'unknown'].includes(step.state) &&
+        ['prepared', 'paused', 'intervention', 'stopped', 'stopped_incomplete'].includes(
+          run.state,
+        )) ||
       (step.state === 'unknown' && run.state === 'stopped_incomplete'),
   )
   function pinReview() {

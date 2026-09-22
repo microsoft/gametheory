@@ -982,10 +982,17 @@ def manual_recovery(
         and step is not None
         and step.state == "unknown"
     )
-    if not stopped_unknown and (
-        state.phase != "recovery" or step is None or step.state != "manual_required"
-    ):
-        raise HTTPException(409, "Only an explicitly manual recovery item accepts a manual report")
+    recovery_report = (
+        body.phase == "recovery"
+        and state.phase == "recovery"
+        and step is not None
+        and step.state in {"manual_required", "rejected", "failed", "unknown"}
+        and state.state in {"prepared", "paused", "intervention", "stopped", "stopped_incomplete"}
+    )
+    if not stopped_unknown and not recovery_report:
+        raise HTTPException(
+            409, "Only unresolved stopped effects or held recovery items accept an external report"
+        )
     if step is None:
         raise HTTPException(409, "Evidence item is unavailable")
     record_event(
@@ -1015,4 +1022,17 @@ def manual_recovery(
         is None
     ):
         state.state = "stopped"
+    if recovery_report:
+        remaining = db.scalar(
+            select(RunStep.step_id)
+            .where(
+                RunStep.run_id == run.id,
+                RunStep.phase == "recovery",
+                RunStep.state.not_in(["succeeded", "manually_accounted"]),
+            )
+            .limit(1)
+        )
+        if remaining is None:
+            state.state, state.active, state.reason = "recovered_with_manual_reports", False, None
+            record_event(db, run, "run.finished", {"phase": "recovery", "state": state.state})
     state.version += 1

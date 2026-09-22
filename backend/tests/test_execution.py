@@ -193,6 +193,46 @@ def test_unconfirmed_write_contract_cannot_become_an_executable_run():
         RunManifest.model_validate(manifest.model_dump())
 
 
+def test_post_cannot_be_repeated_as_a_read_and_waits_fit_window():
+    manifest = example_manifest()
+    config = manifest.preparation.configurations[0]
+    config.content.catalog.operations[0].invocation.method = "POST"
+    config.digest = canonical_digest(config.content.model_dump(mode="json"))
+    with pytest.raises(ValidationError, match="Only GET"):
+        RunManifest.model_validate(manifest.model_dump())
+    manifest = example_manifest()
+    manifest.preparation.draft.steps.append(
+        PreparationStep(
+            id=uuid4(),
+            label="Too long",
+            kind="wait",
+            wait_seconds=7200,
+        )
+    )
+    with pytest.raises(ValidationError, match="Fixed waits"):
+        RunManifest.model_validate(manifest.model_dump())
+
+
+def test_activity_failure_keeps_an_intervention_workflow_alive(monkeypatch):
+    from durabletask.internal.orchestrator_service_pb2 import TaskFailureDetails
+
+    context = Mock()
+    activity, intervention, timer, control = Mock(), Mock(), Mock(), Mock()
+    context.call_activity.side_effect = [activity, intervention, activity]
+    context.create_timer.return_value = timer
+    context.wait_for_external_event.return_value = control
+    monkeypatch.setattr(worker.task, "when_any", lambda tasks: timer)
+    flow = worker.exercise_v1(context, "dispatch")
+    assert next(flow) is activity
+    failure = worker.task.TaskFailedError(
+        "fixture", TaskFailureDetails(errorType="Fixture", errorMessage="fixture")
+    )
+    assert flow.throw(failure) is intervention
+    assert context.call_activity.call_args.kwargs["retry_policy"].max_number_of_attempts == 3
+    assert flow.send(None) is timer
+    assert flow.send(timer) is activity
+
+
 def test_write_observation_and_fabricated_objective_fields_are_rejected():
     manifest = example_manifest(effect="write")
     sid = manifest.preparation.draft.steps[0].id

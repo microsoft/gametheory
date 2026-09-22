@@ -494,7 +494,7 @@ def advance(dispatch_id: str) -> Tick:
             },
             sid,
         )
-        if row.attempt_id != attempt_id:
+        if row.attempt_id != attempt_id or row.state == "manually_accounted":
             return tick()
         row.result, row.reason, row.lease_until = (
             json.dumps(result.values, allow_nan=False),
@@ -530,6 +530,20 @@ def advance(dispatch_id: str) -> Tick:
                 "intervention",
                 result.reason or f"Operation {result.outcome}",
             )
+        if state.stop_requested and not state.active:
+            db.flush()
+            unresolved = db.scalar(
+                select(RunStep.step_id)
+                .where(
+                    RunStep.run_id == rid,
+                    RunStep.phase == phase,
+                    RunStep.state.in_(["unknown", "in_flight"]),
+                )
+                .limit(1)
+            )
+            if unresolved is None:
+                state.state, state.reason = "stopped", None
+                record_event(db, run, "stop.reconciled", {"phase": phase, "attempt_id": attempt_id})
         state.version += 1
     return tick()
 

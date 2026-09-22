@@ -22,9 +22,11 @@ from gametheory.persistence import (
 pytestmark = pytest.mark.integration
 
 
-def dispatch_for(factory, rid):
+def dispatch_for(factory, rid, phase="exercise"):
     with factory() as db:
-        return db.scalar(select(RunDispatch.id).where(RunDispatch.run_id == rid))
+        return db.scalar(
+            select(RunDispatch.id).where(RunDispatch.run_id == rid, RunDispatch.phase == phase)
+        )
 
 
 def test_nonproduction_runs_without_fabricating_approval_and_persists_effect_evidence(
@@ -301,3 +303,81 @@ def test_other_explicit_operator_can_stop_after_original_grant_is_revoked(
     monkeypatch.setattr(worker, "invoke", lambda *_: calls.append(True))
     assert worker.advance(dispatch_for(sql_factory, case.run["id"]))["done"]
     assert not calls
+
+
+@pytest.mark.parametrize("automatic,conflict", [(False, False), (True, False), (True, True)])
+def test_recovery_uses_recorded_preconditions_and_manual_reports_are_not_verified_success(
+    sql_client,
+    sql_factory,
+    monkeypatch,
+    tmp_path,
+    automatic,
+    conflict,
+):
+    case = execution_case(
+        sql_client, sql_factory, monkeypatch, tmp_path, mutation=True, recovery=automatic
+    )
+    values = {
+        "quantity": 86,
+        "outcome": "succeeded",
+        "durable_event_id": str(uuid4()),
+        "committed_at": datetime.now(UTC).isoformat(),
+        "run_id": str(uuid4()),
+        "record_version": "v1:owned-record",
+    }
+    calls = []
+
+    def effect(_target, operation, parameters, key):
+        calls.append((operation.key, parameters, key))
+        if operation.key == "record.recover":
+            assert parameters["expected_version"] == values["record_version"]
+            assert parameters["run_id"] == values["run_id"]
+            if conflict:
+                return AdapterResult(
+                    outcome="rejected", reason="Target record was changed by a participant"
+                )
+        return AdapterResult(outcome="succeeded", values=values)
+
+    monkeypatch.setattr(worker, "invoke", effect)
+    require(case.control("authorize"))
+    require(case.control("start"))
+    did = dispatch_for(sql_factory, case.run["id"])
+    worker.advance(did)
+    assert worker.advance(did)["done"]
+    recovery = require(case.control("recover"))
+    assert recovery["phase"] == "recovery" and recovery["state"] == "prepared"
+    assert len(calls) == 1
+    if automatic:
+        require(case.control("authorize"))
+        require(case.control("start"))
+        recovery_dispatch = dispatch_for(sql_factory, case.run["id"], "recovery")
+        worker.advance(recovery_dispatch)
+        assert len(calls) == 2
+        assert calls[0][2] != calls[1][2]
+        if not conflict:
+            assert worker.advance(recovery_dispatch)["done"]
+            assert require(case.client.get(case.run_path))["state"] == "recovered"
+            return
+        assert require(case.client.get(case.run_path))["state"] == "intervention"
+    current = require(case.client.get(case.run_path))
+    step = next(item for item in current["steps"] if item["phase"] == "recovery")
+    report = require(
+        case.client.post(
+            case.run_path + "/manual-recovery-reports",
+            headers={
+                "If-Match": f'"{current["version"]}"',
+            },
+            json={
+                "phase": "recovery",
+                "step_id": step["step_id"],
+                "evidence_reference": "receipt:external-operator",
+                "note": "Participant changes preserved and accounted for externally; not automatic rollback.",
+            },
+        )
+    )
+    assert report["state"] == "recovered_with_manual_reports"
+    assert (
+        next(item for item in report["steps"] if item["phase"] == "recovery")["state"]
+        == "manually_accounted"
+    )
+    assert len(calls) == (2 if automatic else 1)
