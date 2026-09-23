@@ -554,3 +554,28 @@ def test_preflight_requires_an_operator_and_the_exact_current_preview(
     )
     assert preflight(case).status_code == 409
     assert preflight(case, version=saved["version"]).status_code == 409
+    windowless = require(
+        case.client.put(
+            case.board_path,
+            headers={"If-Match": f'"{saved["version"]}"'},
+            json={**saved["draft"], "window": None},
+        )
+    )
+    frozen = require(
+        case.client.post(
+            case.board_path + "/previews",
+            headers={"If-Match": f'"{windowless["version"]}"'},
+        ),
+        201,
+    )
+    checked = require(
+        case.client.post(
+            case.board_path + "/runs/preflight",
+            headers={"If-Match": f'"{windowless["version"]}"'},
+            json={"preview_id": frozen["id"], "preview_digest": frozen["digest"]},
+        )
+    )
+    assert checked["valid"] is False
+    assert [item["code"] for item in checked["issues"]] == ["missing_operations_or_window"]
+    assert "window_ended" not in {item["code"] for item in checked["blockers"]}
+    assert checked["window_starts_at"] is None and checked["window_ends_at"] is None

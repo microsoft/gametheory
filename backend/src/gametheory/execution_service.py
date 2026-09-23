@@ -878,7 +878,10 @@ def preflight_run(
             if step.id in operations and operations[step.id].effect == "write"
         ],
         issues=issues,
-        blockers=check.details,
+        # A missing window is already a located setup issue; don't also call it "ended".
+        blockers=[
+            item for item in check.details if window is not None or item.code != "window_ended"
+        ],
     )
 
 
