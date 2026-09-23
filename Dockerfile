@@ -4,6 +4,8 @@ COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/package.json
 RUN npm ci --no-audit --no-fund
 COPY apps/web apps/web
+# Web tests type-check against the golden run-setup fixture shared with the backend tests.
+COPY backend/tests/fixtures/guided-run-setup.json backend/tests/fixtures/guided-run-setup.json
 RUN npm run build
 
 FROM python:3.12-slim-bookworm AS runtime
