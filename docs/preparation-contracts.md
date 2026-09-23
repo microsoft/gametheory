@@ -1,9 +1,12 @@
 # Preparation contracts v1
 
-Game Theory prepares exercises; it does not execute them in this milestone.
+These v1 contracts describe preparation; they never execute an exercise.
 Preparation approval is explicitly **not authorization to execute**. The product
 does not contain an exercise catalog, installer, or domain-specific connectors.
 Users register operation descriptions and author scenarios through the UI.
+The separate [executable-v2 workflow](execution.md) evaluates administrator
+environment policies and explicitly authorized SQL/REST targets. Historical v1
+previews and preparation decisions retain their original content and meaning.
 
 ## Operation catalog: `operation-catalog/v1`
 
@@ -145,9 +148,11 @@ references, not string interpolation, scripts, or calls during preview.
 Missing target bindings, concrete record IDs, identity references, notification
 inputs, recovery choices, or an explicit time window are readiness findings.
 No target contents, permissions, connectivity, or evidence are inferred from
-these descriptions. Production/unclassified targets cannot become execution
-eligible. A valid static preview still reports unverified live readiness and
-disabled execution.
+these descriptions. The v1 preparation/future-execution boundary retains its
+original production/unclassified eligibility findings. Executable-v2 instead
+requires explicit environment classification, mandatory production approval,
+configurable nonproduction approval, and operator target readiness. A valid
+static preview still reports unverified live readiness and no execution authority.
 
 Every material edit needs a fresh preview and approval. An approver must have
 current workspace access and an explicit workspace approver grant, and cannot
@@ -160,9 +165,11 @@ and `execution_authorized` is always false. Read-time validity also checks
 current authorization, configuration withdrawal, expiry and the board version.
 It never changes the approved snapshot or promotes into execution authorization.
 
-A future execution manifest must be a distinct strict type, with complete
+The retained future-only execution-v1 schema is not a runtime endpoint. The
+separate executable-v2 manifest is a distinct strict type, with complete
 bindings and approved concrete inputs, an explicit bounded window, and fresh
-execution authorization. It cannot accept an unresolved preparation manifest.
+execution authorization under current environment policy. It cannot accept an
+unresolved preparation manifest or reuse a preparation approval.
 
 ## Product API surface
 

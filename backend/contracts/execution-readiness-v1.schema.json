@@ -1,0 +1,55 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "configuration_id": {
+      "format": "uuid",
+      "title": "Configuration Id",
+      "type": "string"
+    },
+    "binding_digest": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Binding Digest",
+      "type": "string"
+    },
+    "checked_at": {
+      "format": "date-time",
+      "title": "Checked At",
+      "type": "string"
+    },
+    "expires_at": {
+      "format": "date-time",
+      "title": "Expires At",
+      "type": "string"
+    },
+    "evidence_reference": {
+      "maxLength": 512,
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_./:@()-]+$",
+      "title": "Evidence Reference",
+      "type": "string"
+    },
+    "checks": {
+      "items": {
+        "enum": [
+          "connectivity",
+          "identity",
+          "permissions",
+          "isolation"
+        ],
+        "type": "string"
+      },
+      "title": "Checks",
+      "type": "array"
+    }
+  },
+  "required": [
+    "configuration_id",
+    "binding_digest",
+    "checked_at",
+    "expires_at",
+    "evidence_reference",
+    "checks"
+  ],
+  "title": "ReadinessReceipt",
+  "type": "object"
+}

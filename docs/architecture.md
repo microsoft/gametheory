@@ -3,7 +3,8 @@
 Game Theory is an organization's exercise **control plane**. Participants continue
 working in their normal systems; there is no participant portal.
 
-This milestone implements authoring and preparation, not exercise execution. A
+The control plane implements authoring, preparation, and a separately gated
+[exercise execution path](execution.md). A
 published scenario revision is an immutable authoring snapshot, **not** permission
 to run it. Connection records and configuration revisions describe inventory and
 proposed integrations, not activated target access. Preparation approval is a
@@ -18,7 +19,8 @@ review of a pinned snapshot and is explicitly not authorization to execute it.
 | Azure SQL                                 | Authoritative memberships, drafts, revisions, asset metadata, conversations, proposals, dispatch intents, audit |
 | Private Blob Storage                      | Immutable uploaded asset versions                                                                               |
 | Durable Task Scheduler                    | Orchestration history, activity delivery, retries and restart recovery                                          |
-| Python Container Apps worker              | Dispatch reconciliation and Agent Framework planning activities                                                 |
+| Python planning worker                    | Dispatch reconciliation and Agent Framework planning activities                                                 |
+| Separate exercise executor                | Policy-gated SQL/REST activities, run dispatch, durable waits, evidence and recovery                            |
 | Operator-configured Foundry project/model | Model inference; no external mutation tools are exposed                                                         |
 
 The separate packages under `exercises/` emulate external operational systems.
@@ -84,7 +86,9 @@ Preparation uses these same workspace boundaries, but approval is an additional,
 explicit workspace capability. Administrator, owner, and editor roles do not
 automatically confer it. Organization administrators manage configuration and
 approver grants; a reviewer cannot approve a board they created or contributed to.
-No role receives exercise execution rights in this milestone.
+Execution rights are separately granted capabilities; no ordinary workspace or
+administrator role confers them automatically. Environment policy always requires
+approval for production and can require it for nonproduction.
 
 ## Preparation contracts and boards
 
@@ -106,9 +110,11 @@ asset version does not change an existing board.
 Static validation checks types, references, bounded flow and policy metadata.
 Readiness findings distinguish missing inputs from live checks not performed.
 Nonproduction labels do not prove authorization, isolation, connectivity, or
-effective target permissions. Production/unclassified targets remain ineligible.
-Before execution exists, the board reports disabled execution and no execution
-evidence, not a simulated run or invented assessment.
+effective target permissions. The preparation-v1 boundary retains its original
+static eligibility findings; it never authorizes execution. The executable-v2
+path instead evaluates administrator-controlled environment policies and actual
+operator bindings. Unclassified environments remain ineligible; production always
+needs independent approval. Preparation itself reports no execution evidence.
 
 Preparation approval pins the exact preview and digest, reviewer, explicit
 expiry, and acknowledgement of unverified prerequisites. Current workspace
@@ -117,11 +123,13 @@ and board version determine its current validity. Old snapshots and decisions
 remain auditable; resolving missing information changes the manifest and requires
 a new review.
 
-Preparation and future execution manifests are separate contracts. No feature
+Preparation and executable run manifests are separate contracts. No feature
 switch promotes one into the other. Actual execution requires complete approved
 targets, a fresh execution approval, dispatch-time authorization, and a separately
-versioned durable orchestration/outbox. The existing `plan_v1` remains planning
-only.
+versioned durable orchestration/outbox. These are implemented in the isolated
+`exercise_v1` executor and run tables. The existing `plan_v1` remains planning only.
+See [execution contracts](execution.md) for policy changes, immutable authorization
+contexts, typed adapters, observation limits, and safe stop/recovery semantics.
 
 ## Durable planning
 

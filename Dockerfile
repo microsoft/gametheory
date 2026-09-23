@@ -35,6 +35,9 @@ CMD ["pytest", "-q", "backend/tests"]
 FROM runtime AS worker
 CMD ["gametheory-worker"]
 
+FROM runtime AS executor
+CMD ["gametheory-executor"]
+
 FROM runtime AS api
 COPY --from=web /build/apps/web/dist /app/apps/web/dist
 EXPOSE 8000

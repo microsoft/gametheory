@@ -1,6 +1,6 @@
 import argparse
 import json
-from datetime import timedelta
+from datetime import UTC, timedelta
 from pathlib import Path
 from uuid import UUID
 
@@ -14,6 +14,7 @@ from gametheory.persistence import (
     Administrator,
     Asset,
     Environment,
+    EnvironmentPolicyRecord,
     Organization,
     Workspace,
     now,
@@ -56,13 +57,86 @@ def main() -> None:
     )
     grants.add_argument("--api-client-id", required=True, type=UUID)
     grants.add_argument("--worker-client-id", required=True, type=UUID)
+    grants.add_argument("--executor-client-id", type=UUID)
+    execution_schemas = commands.add_parser(
+        "execution-schemas", help="Export executable run and operator binding contracts"
+    )
+    execution_schemas.add_argument("--directory", default="backend/contracts")
+    readiness = commands.add_parser(
+        "execution-readiness",
+        help="Record an operator's externally verified readiness receipt; never probes a target",
+    )
+    readiness.add_argument("--file", required=True)
     args = parser.parse_args()
     if args.command == "database-grants":
         from gametheory.database_setup import provision_runtime_users
 
         with session_factory().begin() as db:
-            provision_runtime_users(db, args.api_client_id, args.worker_client_id)
+            provision_runtime_users(
+                db, args.api_client_id, args.worker_client_id, args.executor_client_id
+            )
         print("Runtime users granted table-scoped permissions; no DDL or administrator writes.")
+        return
+    if args.command == "execution-schemas":
+        from pydantic import TypeAdapter
+
+        from gametheory.execution import ReadinessReceipt, RunManifest
+        from gametheory.execution_adapters import TargetBinding
+
+        directory = Path(args.directory)
+        directory.mkdir(parents=True, exist_ok=True)
+        for filename, content in (
+            ("execution-manifest-v2.schema.json", RunManifest.model_json_schema()),
+            ("execution-bindings-v1.schema.json", TypeAdapter(list[TargetBinding]).json_schema()),
+            ("execution-readiness-v1.schema.json", ReadinessReceipt.model_json_schema()),
+        ):
+            (directory / filename).write_text(json.dumps(content, indent=2) + "\n")
+        return
+    if args.command == "execution-readiness":
+        from gametheory.execution import ReadinessReceipt
+        from gametheory.execution_adapters import binding_for, bindings
+        from gametheory.persistence import ConnectionConfigurationRecord, TargetReadiness
+        from gametheory.preparation import ConfigurationSnapshot, strict_json
+
+        receipt = ReadinessReceipt.model_validate(strict_json(Path(args.file).read_bytes()))
+        checked = receipt.checked_at.astimezone(UTC).replace(tzinfo=None)
+        expiry = receipt.expires_at.astimezone(UTC).replace(tzinfo=None)
+        if checked > now() or expiry <= now() or expiry > now() + timedelta(days=30):
+            parser.error("Readiness must already have been checked and expire within thirty days")
+        with session_factory().begin() as db:
+            config = db.get(ConnectionConfigurationRecord, str(receipt.configuration_id))
+            if config is None:
+                parser.error("Configuration does not exist")
+            snapshot = ConfigurationSnapshot.model_validate_json(config.snapshot)
+            target = binding_for(snapshot, bindings())
+            if target.digest != receipt.binding_digest:
+                parser.error("Receipt does not describe the current operator target binding")
+            identity = db.scalar(text("SELECT ORIGINAL_LOGIN()"))
+            if not isinstance(identity, str) or not identity:
+                raise RuntimeError("Cannot identify the readiness operator")
+            record = TargetReadiness(
+                configuration_id=config.id,
+                configuration_digest=snapshot.digest,
+                binding_digest=target.digest,
+                evidence_reference=receipt.evidence_reference,
+                actor=f"sql:{identity}",
+                checked_at=checked,
+                expires_at=expiry,
+            )
+            db.add(record)
+            db.flush()
+            record_id = record.id
+            workspace = db.get(Workspace, config.workspace_id)
+            if workspace is None:
+                raise RuntimeError("Readiness workspace is unavailable")
+            audit(
+                db,
+                Principal(workspace.organization_id, f"sql:{identity}"),
+                "execution.readiness_attested",
+                record.id,
+                workspace.id,
+            )
+        print(f"Operator readiness attestation recorded: {record_id}. No target was contacted.")
         return
     if args.command == "openapi":
         from gametheory.api import app
@@ -171,7 +245,19 @@ def main() -> None:
             db.add(Organization(id=actor.tenant, name=args.organization_name.strip()))
             db.flush()
             for name in ["Dev", "Test", "Staging", "QA", "Production"]:
-                db.add(Environment(organization_id=actor.tenant, name=name))
+                environment = Environment(organization_id=actor.tenant, name=name)
+                db.add(environment)
+                db.flush()
+                db.add(
+                    EnvironmentPolicyRecord(
+                        environment_id=environment.id,
+                        version=1,
+                        classification="production" if name == "Production" else "nonproduction",
+                        execution_enabled=False,
+                        approval_required=name == "Production",
+                        actor=actor.object_id,
+                    )
+                )
         if db.get(Administrator, (actor.tenant, actor.object_id)):
             parser.error("This administrator is already registered")
         db.add(Administrator(organization_id=actor.tenant, object_id=actor.object_id))

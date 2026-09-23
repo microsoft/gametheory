@@ -96,7 +96,21 @@ export function UnsavedChanges({ dirty, onExport }: { dirty: boolean; onExport: 
   )
 }
 
-export function ExecutionBoundary() {
+export function ExecutionBoundary({
+  executionAvailable = false,
+}: {
+  executionAvailable?: boolean
+}) {
+  if (executionAvailable)
+    return (
+      <div className="notice preparation-boundary">
+        <strong>Preparation is not execution authority.</strong>
+        <p>
+          Use Exercise runs for current environment policy, independent approval where required,
+          readiness, and execution evidence. This preparation preview never contacts a target.
+        </p>
+      </div>
+    )
   return (
     <div className="notice preparation-boundary">
       <div>
@@ -110,7 +124,7 @@ export function ExecutionBoundary() {
         Execution disabled
       </button>
       <span id="execution-boundary" className="sr-only">
-        This release cannot run exercises or write to connected systems.
+        This deployment has not enabled the separate exercise executor.
       </span>
     </div>
   )

@@ -936,7 +936,7 @@ def preparation_findings(manifest: PreparationManifest) -> list[PreparationFindi
         ):
             add(
                 "target_classification_ineligible",
-                "Production or unclassified targets are ineligible for execution.",
+                "This preparation-v1 boundary cannot authorize production or unclassified targets. The separate run workflow evaluates current environment policy.",
                 path,
             )
         required = ["resource_id", "endpoint", "identity_ref"]
@@ -989,7 +989,7 @@ def preparation_findings(manifest: PreparationManifest) -> list[PreparationFindi
     )
     add(
         "execution_disabled",
-        "Execution is disabled. Preparation approval cannot authorize execution.",
+        "Execution is disabled for this preparation preview. Only the separate run workflow can evaluate execution authority.",
     )
     return findings
 

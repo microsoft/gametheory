@@ -956,6 +956,7 @@ httpx==0.28.1 \
     --hash=sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad
     # via
     #   -c backend/requirements.lock
+    #   gametheory (backend/pyproject.toml)
     #   agent-framework-foundry
 httpx2==2.13.0 \
     --hash=sha256:81bd07dc67a3701729ef1f777a3c00c915d4539604fdb5afd327f8682f6b7b44 \

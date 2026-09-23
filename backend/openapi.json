@@ -2545,6 +2545,1007 @@
           }
         }
       }
+    },
+    "/api/admin/runtime": {
+      "get": {
+        "tags": [
+          "Administration"
+        ],
+        "summary": "Runtime",
+        "operationId": "runtime_api_admin_runtime_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/environment-policies": {
+      "get": {
+        "tags": [
+          "Administration"
+        ],
+        "summary": "Policies",
+        "operationId": "policies_api_admin_environment_policies_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EnvironmentPolicyView"
+                  },
+                  "type": "array",
+                  "title": "Response Policies Api Admin Environment Policies Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/admin/environment-policies/{eid}": {
+      "get": {
+        "tags": [
+          "Administration"
+        ],
+        "summary": "Policy",
+        "operationId": "policy_api_admin_environment_policies__eid__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "eid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Eid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentPolicyView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Administration"
+        ],
+        "summary": "Update Policy",
+        "operationId": "update_policy_api_admin_environment_policies__eid__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "eid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Eid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnvironmentPolicyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentPolicyView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/environment-policies/{eid}/history": {
+      "get": {
+        "tags": [
+          "Administration"
+        ],
+        "summary": "Policy History",
+        "operationId": "policy_history_api_admin_environment_policies__eid__history_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "eid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Eid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EnvironmentPolicyView"
+                  },
+                  "title": "Response Policy History Api Admin Environment Policies  Eid  History Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/execution-grants": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Grants",
+        "operationId": "grants_api_workspaces__wid__execution_grants_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExecutionGrantView"
+                  },
+                  "title": "Response Grants Api Workspaces  Wid  Execution Grants Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Grant",
+        "operationId": "grant_api_workspaces__wid__execution_grants_put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutionGrantInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecutionGrantView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/execution-grants/{oid}/{capability}": {
+      "delete": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Revoke Grant",
+        "operationId": "revoke_grant_api_workspaces__wid__execution_grants__oid___capability__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "oid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Oid"
+            }
+          },
+          {
+            "name": "capability",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "operator",
+                "reviewer"
+              ],
+              "type": "string",
+              "title": "Capability"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/boards/{bid}/runs": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Runs",
+        "operationId": "runs_api_workspaces__wid__boards__bid__runs_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RunSummary"
+                  },
+                  "title": "Response Runs Api Workspaces  Wid  Boards  Bid  Runs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Create Run",
+        "operationId": "create_run_api_workspaces__wid__boards__bid__runs_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/runs/{rid}": {
+      "get": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Run",
+        "operationId": "run_api_workspaces__wid__runs__rid__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/runs/{rid}/controls": {
+      "post": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Control",
+        "operationId": "control_api_workspaces__wid__runs__rid__controls_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunControl"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/runs/{rid}/approvals": {
+      "post": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Approve",
+        "operationId": "approve_api_workspaces__wid__runs__rid__approvals_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunApprovalInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/runs/{rid}/approvals/{aid}/revoke": {
+      "post": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Revoke Approval",
+        "operationId": "revoke_approval_api_workspaces__wid__runs__rid__approvals__aid__revoke_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rid"
+            }
+          },
+          {
+            "name": "aid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Aid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunView"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Strong numeric resource version for If-Match.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^\"[1-9][0-9]*\"$"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{wid}/runs/{rid}/manual-recovery-reports": {
+      "post": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Manual Report",
+        "operationId": "manual_report_api_workspaces__wid__runs__rid__manual_recovery_reports_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "rid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Rid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualRecoveryInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3379,6 +4380,94 @@
         ],
         "title": "ConnectionInput"
       },
+      "EnvironmentPolicyInput": {
+        "properties": {
+          "classification": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "nonproduction",
+              "production"
+            ],
+            "title": "Classification"
+          },
+          "execution_enabled": {
+            "type": "boolean",
+            "title": "Execution Enabled",
+            "default": false
+          },
+          "approval_required": {
+            "type": "boolean",
+            "title": "Approval Required",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "classification"
+        ],
+        "title": "EnvironmentPolicyInput"
+      },
+      "EnvironmentPolicyView": {
+        "properties": {
+          "classification": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "nonproduction",
+              "production"
+            ],
+            "title": "Classification"
+          },
+          "execution_enabled": {
+            "type": "boolean",
+            "title": "Execution Enabled",
+            "default": false
+          },
+          "approval_required": {
+            "type": "boolean",
+            "title": "Approval Required",
+            "default": false
+          },
+          "environment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Environment Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Name"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "updated_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Updated By"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "classification",
+          "environment_id",
+          "name",
+          "version",
+          "updated_by",
+          "updated_at"
+        ],
+        "title": "EnvironmentPolicyView"
+      },
       "ExecutionDisabled": {
         "properties": {
           "code": {
@@ -3402,6 +4491,77 @@
         "additionalProperties": false,
         "type": "object",
         "title": "ExecutionDisabled"
+      },
+      "ExecutionGrantInput": {
+        "properties": {
+          "object_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Object Id"
+          },
+          "capability": {
+            "type": "string",
+            "enum": [
+              "operator",
+              "reviewer"
+            ],
+            "title": "Capability"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "object_id",
+          "capability"
+        ],
+        "title": "ExecutionGrantInput"
+      },
+      "ExecutionGrantView": {
+        "properties": {
+          "object_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Object Id"
+          },
+          "capability": {
+            "type": "string",
+            "enum": [
+              "operator",
+              "reviewer"
+            ],
+            "title": "Capability"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workspace Id"
+          },
+          "granted_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Granted By"
+          },
+          "granted_at": {
+            "type": "string",
+            "title": "Granted At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "object_id",
+          "capability",
+          "id",
+          "workspace_id",
+          "granted_by",
+          "granted_at"
+        ],
+        "title": "ExecutionGrantView"
       },
       "FlowEdge": {
         "properties": {
@@ -3539,6 +4699,45 @@
         "title": "HTTPValidationError"
       },
       "JsonValue": {},
+      "ManualRecoveryInput": {
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Step Id"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "exercise",
+              "recovery"
+            ],
+            "title": "Phase",
+            "default": "recovery"
+          },
+          "evidence_reference": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_./:@()+-]+$",
+            "title": "Evidence Reference"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "step_id",
+          "evidence_reference",
+          "note"
+        ],
+        "title": "ManualRecoveryInput"
+      },
       "MeView": {
         "properties": {
           "object_id": {
@@ -3669,6 +4868,230 @@
           "criterion"
         ],
         "title": "Objective"
+      },
+      "ObjectiveFinding": {
+        "properties": {
+          "objective_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Objective Id"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "met",
+              "unmet",
+              "indeterminate"
+            ],
+            "title": "State"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Evidence Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "objective_id",
+          "state",
+          "reason",
+          "evidence_ids"
+        ],
+        "title": "ObjectiveFinding"
+      },
+      "ObjectiveRule": {
+        "properties": {
+          "objective_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Objective Id"
+          },
+          "step_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Step Id"
+          },
+          "field": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+            "title": "Field"
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "eq",
+              "ne",
+              "gt",
+              "gte",
+              "lt",
+              "lte"
+            ],
+            "title": "Operator"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "$ref": "#/components/schemas/PriorResultReference"
+              }
+            ],
+            "title": "Value"
+          },
+          "anchor_step_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchor Step Id"
+          },
+          "anchor_field": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anchor Field"
+          },
+          "within_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 604800.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Within Seconds"
+          },
+          "source_time_field": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Time Field"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "objective_id",
+          "step_id",
+          "field",
+          "operator",
+          "value"
+        ],
+        "title": "ObjectiveRule"
+      },
+      "Observation": {
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Step Id"
+          },
+          "field": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+            "title": "Field"
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "eq",
+              "ne",
+              "gt",
+              "gte",
+              "lt",
+              "lte"
+            ],
+            "title": "Operator"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4000
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "title": "Value"
+          },
+          "interval_seconds": {
+            "type": "integer",
+            "maximum": 3600.0,
+            "minimum": 1.0,
+            "title": "Interval Seconds",
+            "default": 10
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 1.0,
+            "title": "Timeout Seconds",
+            "default": 600
+          },
+          "max_samples": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Max Samples",
+            "default": 100
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "step_id",
+          "field",
+          "operator",
+          "value"
+        ],
+        "title": "Observation"
       },
       "OperationBinding": {
         "properties": {
@@ -4475,6 +5898,105 @@
         "title": "PriorResultReference",
         "description": "A required declared result of a guaranteed earlier operation; never evaluated here."
       },
+      "ReadinessView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "configuration_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Configuration Id"
+          },
+          "checked_at": {
+            "type": "string",
+            "title": "Checked At"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "evidence_reference": {
+            "type": "string",
+            "title": "Evidence Reference"
+          },
+          "operator": {
+            "type": "string",
+            "title": "Operator"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "configuration_id",
+          "checked_at",
+          "expires_at",
+          "evidence_reference",
+          "operator"
+        ],
+        "title": "ReadinessView"
+      },
+      "RecoveryBinding": {
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Step Id"
+          },
+          "binding": {
+            "$ref": "#/components/schemas/OperationBinding"
+          },
+          "parameters": {
+            "patternProperties": {
+              "^[A-Za-z_][A-Za-z0-9_]{0,63}$": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 4000
+                  },
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PriorResultReference"
+                  }
+                ]
+              }
+            },
+            "type": "object",
+            "title": "Parameters"
+          },
+          "ownership_parameter": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+            "title": "Ownership Parameter"
+          },
+          "version_parameter": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
+            "title": "Version Parameter"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "step_id",
+          "binding",
+          "parameters",
+          "ownership_parameter",
+          "version_parameter"
+        ],
+        "title": "RecoveryBinding"
+      },
       "RestInvocation": {
         "properties": {
           "kind": {
@@ -4509,6 +6031,647 @@
         ],
         "title": "RestInvocation",
         "description": "Description only: expected_version maps to future strong If-Match.\n\nIt is a string with explicit max_length and a bare, unquoted opaque value.\nThe future dispatcher owns Idempotency-Key; catalogs cannot supply headers.\nRemaining non-path parameters are GET query fields or a flat write body."
+      },
+      "RunApprovalInput": {
+        "properties": {
+          "context_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Context Id"
+          },
+          "manifest_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Manifest Digest"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "title": "Decision"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "context_id",
+          "manifest_digest",
+          "decision",
+          "expires_at",
+          "note"
+        ],
+        "title": "RunApprovalInput"
+      },
+      "RunAuthorizationView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentPolicyView"
+            },
+            "type": "array",
+            "title": "Policies"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/TargetAuthorityView"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "readiness": {
+            "items": {
+              "$ref": "#/components/schemas/ReadinessView"
+            },
+            "type": "array",
+            "title": "Readiness"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "created_by",
+          "created_at",
+          "policies",
+          "targets",
+          "readiness"
+        ],
+        "title": "RunAuthorizationView"
+      },
+      "RunControl": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "authorize",
+              "start",
+              "pause",
+              "resume",
+              "stop",
+              "reconcile",
+              "recover"
+            ],
+            "title": "Action"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action",
+          "note"
+        ],
+        "title": "RunControl"
+      },
+      "RunCreate": {
+        "properties": {
+          "preview_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Preview Id"
+          },
+          "preview_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Preview Digest"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "scheduled"
+            ],
+            "title": "Trigger",
+            "default": "manual"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/Observation"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Observations"
+          },
+          "objectives": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectiveRule"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Objectives"
+          },
+          "recovery": {
+            "items": {
+              "$ref": "#/components/schemas/RecoveryBinding"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Recovery"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "preview_id",
+          "preview_digest"
+        ],
+        "title": "RunCreate"
+      },
+      "RunEventView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "detail": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 4000
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "step_id",
+          "created_at",
+          "detail"
+        ],
+        "title": "RunEventView"
+      },
+      "RunManifest": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "exercise-execution/v2",
+            "title": "Schema Version",
+            "default": "exercise-execution/v2"
+          },
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "preparation": {
+            "$ref": "#/components/schemas/PreparationManifest"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "scheduled"
+            ],
+            "title": "Trigger"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/Observation"
+            },
+            "type": "array",
+            "title": "Observations"
+          },
+          "objectives": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectiveRule"
+            },
+            "type": "array",
+            "title": "Objectives"
+          },
+          "recovery": {
+            "items": {
+              "$ref": "#/components/schemas/RecoveryBinding"
+            },
+            "type": "array",
+            "title": "Recovery"
+          },
+          "sql_idempotency": {
+            "type": "string",
+            "const": "dispatcher-owned/v1",
+            "title": "Sql Idempotency",
+            "default": "dispatcher-owned/v1"
+          },
+          "max_operations": {
+            "type": "integer",
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Max Operations",
+            "default": 1000
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "preparation",
+          "trigger",
+          "observations",
+          "objectives",
+          "recovery"
+        ],
+        "title": "RunManifest"
+      },
+      "RunStepView": {
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "title": "Step Id"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "exercise",
+              "recovery"
+            ],
+            "title": "Phase"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "result": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 4000
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Result"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "samples": {
+            "type": "integer",
+            "title": "Samples"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "step_id",
+          "phase",
+          "state",
+          "result",
+          "reason",
+          "samples",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "RunStepView"
+      },
+      "RunSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "board_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Board Id"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "exercise",
+              "recovery"
+            ],
+            "title": "Phase"
+          },
+          "operator": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Operator"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "board_id",
+          "state",
+          "phase",
+          "operator",
+          "created_at"
+        ],
+        "title": "RunSummary"
+      },
+      "RunView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "board_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Board Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "exercise",
+              "recovery"
+            ],
+            "title": "Phase"
+          },
+          "operator": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Operator"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "manifest_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Manifest Digest"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/RunManifest"
+          },
+          "context_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Id"
+          },
+          "authorization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunAuthorizationView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approval_required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Required"
+          },
+          "approval_status": {
+            "type": "string",
+            "enum": [
+              "not_required",
+              "required",
+              "approved",
+              "rejected",
+              "invalid",
+              "unresolved"
+            ],
+            "title": "Approval Status"
+          },
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blockers"
+          },
+          "can_operate": {
+            "type": "boolean",
+            "title": "Can Operate"
+          },
+          "can_stop": {
+            "type": "boolean",
+            "title": "Can Stop"
+          },
+          "can_review": {
+            "type": "boolean",
+            "title": "Can Review"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/RunStepView"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/RunEventView"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectiveFinding"
+            },
+            "type": "array",
+            "title": "Findings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "board_id",
+          "version",
+          "state",
+          "phase",
+          "operator",
+          "created_at",
+          "manifest_digest",
+          "manifest",
+          "context_id",
+          "authorization",
+          "approval_required",
+          "approval_status",
+          "blockers",
+          "can_operate",
+          "can_stop",
+          "can_review",
+          "steps",
+          "events",
+          "findings"
+        ],
+        "title": "RunView"
+      },
+      "RuntimeStatus": {
+        "properties": {
+          "execution_enabled": {
+            "type": "boolean",
+            "title": "Execution Enabled"
+          },
+          "sql_configured": {
+            "type": "boolean",
+            "title": "Sql Configured"
+          },
+          "scheduler_configured": {
+            "type": "boolean",
+            "title": "Scheduler Configured"
+          },
+          "target_bindings_configured": {
+            "type": "boolean",
+            "title": "Target Bindings Configured"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "execution_enabled",
+          "sql_configured",
+          "scheduler_configured",
+          "target_bindings_configured",
+          "message"
+        ],
+        "title": "RuntimeStatus"
       },
       "ScenarioContent": {
         "properties": {
@@ -4722,6 +6885,70 @@
           "value"
         ],
         "title": "StepCondition"
+      },
+      "TargetAuthorityView": {
+        "properties": {
+          "configuration_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Configuration Id"
+          },
+          "resource_id": {
+            "type": "string",
+            "title": "Resource Id"
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint"
+          },
+          "database": {
+            "type": "string",
+            "title": "Database"
+          },
+          "identity_ref": {
+            "type": "string",
+            "title": "Identity Ref"
+          },
+          "client_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Client Id"
+          },
+          "token_scope": {
+            "type": "string",
+            "title": "Token Scope"
+          },
+          "operation_digests": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "type": "array",
+            "title": "Operation Digests"
+          },
+          "replayable_operations": {
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "type": "array",
+            "title": "Replayable Operations"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "configuration_id",
+          "resource_id",
+          "endpoint",
+          "database",
+          "identity_ref",
+          "client_id",
+          "token_scope",
+          "operation_digests",
+          "replayable_operations"
+        ],
+        "title": "TargetAuthorityView"
       },
       "ValidationError": {
         "properties": {

@@ -19,6 +19,7 @@ import {
   type Preview,
 } from './preparation'
 import type { Connection } from './types'
+import { BoardRuns, emptyRunSetup } from './ExerciseRuns'
 
 export function PreparationBoard() {
   const { wid = '', bid = '' } = useParams()
@@ -26,13 +27,26 @@ export function PreparationBoard() {
 }
 
 export function PreparationBoardContent({ wid, bid }: { wid: string; bid: string }) {
-  const { api } = useSession()
+  const { api, config: appConfig } = useSession()
   const cache = useQueryClient()
   const path = `/workspaces/${wid}/boards/${bid}`
   const key = [wid, 'board', bid]
   const [base, setBase] = useState<BoardView>()
   const [draft, setDraft] = useState<BoardDraft>()
-  const [pane, setPane] = useState<'draft' | 'preview' | 'history'>('draft')
+  const [pane, setPane] = useState<'draft' | 'preview' | 'history' | 'runs'>('draft')
+  const [runInput, setRunInput] = useState(emptyRunSetup)
+  function changePane(next: typeof pane) {
+    if (
+      pane === 'runs' &&
+      next !== 'runs' &&
+      runInput.dirty &&
+      !window.confirm(
+        'Discard unsaved run bindings? Export local input before leaving this section.',
+      )
+    )
+      return
+    setPane(next)
+  }
   const [selectedPreviewId, setSelectedPreviewId] = useState('')
   const [decision, setDecision] = useState<Approval['decision'] | ''>('')
   const [expires, setExpires] = useState('')
@@ -163,7 +177,7 @@ export function PreparationBoardContent({ wid, bid }: { wid: string; bid: string
     onSuccess: async (value) => {
       setSelectedPreviewId(value.id)
       setAcknowledged(false)
-      setPane('preview')
+      changePane('preview')
       setNotice(
         `Preview ${value.sequence} froze saved board version ${value.board_version}. Live prerequisites remain unverified.`,
       )
@@ -254,6 +268,7 @@ export function PreparationBoardContent({ wid, bid }: { wid: string; bid: string
     exportJson(
       {
         draft,
+        run_input: runInput.dirty ? runInput : undefined,
         review_input: reviewDirty
           ? {
               preview_id: selectedPreviewId,
@@ -339,7 +354,7 @@ export function PreparationBoardContent({ wid, bid }: { wid: string; bid: string
           </button>
         </div>
       </div>
-      <ExecutionBoundary />
+      <ExecutionBoundary executionAvailable={appConfig.capabilities.execution} />
       <ErrorNotice error={error} />
       <ConflictNotice
         error={conflict}
@@ -381,18 +396,39 @@ export function PreparationBoardContent({ wid, bid }: { wid: string; bid: string
         </section>
       )}
       <nav className="tabs" aria-label="Board sections">
-        <button type="button" aria-current={pane === 'draft'} onClick={() => setPane('draft')}>
+        <button type="button" aria-current={pane === 'draft'} onClick={() => changePane('draft')}>
           Preparation
         </button>
-        <button type="button" aria-current={pane === 'preview'} onClick={() => setPane('preview')}>
+        <button
+          type="button"
+          aria-current={pane === 'preview'}
+          onClick={() => changePane('preview')}
+        >
           Preview & review
         </button>
-        <button type="button" aria-current={pane === 'history'} onClick={() => setPane('history')}>
+        <button
+          type="button"
+          aria-current={pane === 'history'}
+          onClick={() => changePane('history')}
+        >
           History
+        </button>
+        <button type="button" aria-current={pane === 'runs'} onClick={() => changePane('runs')}>
+          Exercise runs
         </button>
       </nav>
       <div className="preparation-layout">
         <div className="stack">
+          {pane === 'runs' && (
+            <BoardRuns
+              onInputChange={setRunInput}
+              wid={wid}
+              bid={bid}
+              version={base.version}
+              preview={selectedPreview}
+              unsaved={dirty || behind}
+            />
+          )}
           {pane === 'draft' && (
             <>
               <ErrorNotice error={configurationError} />
@@ -669,7 +705,10 @@ export function PreparationBoardContent({ wid, bid }: { wid: string; bid: string
         </div>
         <BoardProvenance board={displayed} />
       </div>
-      <UnsavedChanges dirty={dirty || reviewDirty || busy} onExport={exportInput} />
+      <UnsavedChanges
+        dirty={dirty || reviewDirty || runInput.dirty || busy}
+        onExport={exportInput}
+      />
     </main>
   )
 }
