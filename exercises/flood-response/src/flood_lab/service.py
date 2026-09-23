@@ -11,6 +11,8 @@ from uuid import UUID, uuid4
 from sqlalchemy import select, true
 from sqlalchemy.orm import Session, sessionmaker
 
+from flood_lab import assessment
+from flood_lab.assessment import Evidence
 from flood_lab.auth import Actor
 from flood_lab.contracts import (
     AcknowledgeRequest,
@@ -19,6 +21,7 @@ from flood_lab.contracts import (
     ErrorView,
     EventList,
     EventView,
+    MilestonesView,
     MutationView,
     OperationError,
     RequestList,
@@ -41,6 +44,17 @@ def canonical(value: Any) -> str:
 
 def fingerprint(payload: dict[str, Any]) -> str:
     return hashlib.sha256(canonical(payload).encode("utf-8")).hexdigest()
+
+
+MILESTONE_OPERATIONS = ("request.create", "request.acknowledge", "request.allocate")
+
+
+def allocated_quantity(event: Event) -> int | None:
+    try:
+        value = json.loads(event.data_json).get("quantity")
+    except (ValueError, AttributeError):
+        return None
+    return value if type(value) is int and value > 0 else None
 
 
 def request_view(record: ResourceRequest) -> RequestView:
@@ -189,6 +203,96 @@ class LabService:
             verify_database(session, self.database_name)
             self._authorize(session, actor, run_id, "read")
             return request_view(self._request(session, run_id, request_id))
+
+    def milestones(
+        self,
+        actor: Actor,
+        run_id: UUID,
+        request_id: UUID,
+        acknowledge_within_seconds: int,
+        allocate_within_seconds: int,
+    ) -> MilestonesView:
+        with self._session() as session:
+            verify_database(session, self.database_name)
+            self._authorize(session, actor, run_id, "read")
+            # One consistent read: writers assign clock values under the exclusive run lock, so
+            # every commit at or before as_of is visible and no later commit can precede it.
+            lock_run(session, run_id, "Shared")
+            as_of = utc_now(session)
+            record = self._request(session, run_id, request_id)
+            events = list(
+                session.scalars(
+                    select(Event)
+                    .where(
+                        Event.run_id == run_id,
+                        Event.record_id == request_id,
+                        Event.outcome == "succeeded",
+                        Event.operation.in_(MILESTONE_OPERATIONS),
+                    )
+                    .order_by(Event.sequence)
+                )
+            )
+            allocations = list(
+                session.scalars(
+                    select(Allocation).where(
+                        Allocation.run_id == run_id, Allocation.request_id == request_id
+                    )
+                )
+            )
+
+            def evidence(operation: str) -> list[Evidence]:
+                return [
+                    Evidence(
+                        item.id,
+                        item.committed_at,
+                        allocated_quantity(item) if operation == "request.allocate" else None,
+                    )
+                    for item in events
+                    if item.operation == operation
+                ]
+
+            assessed = assessment.milestones(
+                created_at=record.created_at,
+                requested_quantity=record.quantity_requested,
+                allocated_quantity=record.quantity_allocated,
+                record_acknowledged_at=record.acknowledged_at,
+                creations=evidence("request.create"),
+                acknowledgements=evidence("request.acknowledge"),
+                allocation_events=evidence("request.allocate"),
+                allocation_records=[
+                    Evidence(item.owner_operation, item.created_at, item.quantity)
+                    for item in allocations
+                ],
+                as_of=as_of,
+                acknowledge_within_seconds=acknowledge_within_seconds,
+                allocate_within_seconds=allocate_within_seconds,
+            )
+            created, acknowledged = assessed.created, assessed.acknowledged
+            completed = assessed.allocation_completed
+            return MilestonesView(
+                request_id=record.id,
+                run_id=record.run_id,
+                record_version=version_value(record.record_version),
+                status=record.status,
+                quantity_requested=record.quantity_requested,
+                quantity_allocated=record.quantity_allocated,
+                created_at=record.created_at,
+                created_event_id=created.durable_event_id if created else None,
+                acknowledged=record.acknowledged_at is not None,
+                acknowledged_at=acknowledged.committed_at if acknowledged else None,
+                acknowledgement_event_id=acknowledged.durable_event_id if acknowledged else None,
+                allocated_total_by_deadline=assessed.allocated_total_by_deadline,
+                allocation_completed_at=completed.committed_at if completed else None,
+                allocation_completed_event_id=completed.durable_event_id if completed else None,
+                allocation_event_count=assessed.allocation_event_count,
+                acknowledgement_deadline=assessed.acknowledgement_deadline,
+                allocation_deadline=assessed.allocation_deadline,
+                as_of=as_of,
+                acknowledged_on_time=assessed.acknowledged_on_time,
+                allocated_on_time=assessed.allocated_on_time,
+                acknowledgement_reason=assessed.acknowledgement_reason,
+                allocation_reason=assessed.allocation_reason,
+            )
 
     def events(
         self, actor: Actor, run_id: UUID, limit: int, after: int, record_id: UUID | None

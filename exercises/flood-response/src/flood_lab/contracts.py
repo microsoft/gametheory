@@ -10,6 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from flood_lab import CONTRACT_VERSION
 
+MILESTONES_CONTRACT_VERSION = "flood-lab-milestones/v1"
+MAX_WINDOW_SECONDS = 604800
+
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -170,6 +173,39 @@ class EventView(StrictModel):
 class EventList(StrictModel):
     items: list[EventView]
     next_after: int | None
+
+
+class MilestonesView(StrictModel):
+    """Bounded authoritative timing for one request, from one consistent lab read.
+
+    Verdicts: true is timely committed evidence; false is late committed evidence, or an
+    insufficient committed allocation after the deadline with complete history; null is
+    undecided or absence. Decided verdicts do not change under sanctioned lab operations.
+    """
+
+    contract_version: Literal["flood-lab-milestones/v1"] = MILESTONES_CONTRACT_VERSION
+    request_id: UUID
+    run_id: UUID
+    record_version: RecordVersion
+    status: Literal["open", "acknowledged", "fulfilled"]
+    quantity_requested: int
+    quantity_allocated: int
+    created_at: datetime
+    created_event_id: UUID | None
+    acknowledged: bool
+    acknowledged_at: datetime | None
+    acknowledgement_event_id: UUID | None
+    allocated_total_by_deadline: int
+    allocation_completed_at: datetime | None
+    allocation_completed_event_id: UUID | None
+    allocation_event_count: int
+    acknowledgement_deadline: datetime
+    allocation_deadline: datetime
+    as_of: datetime
+    acknowledged_on_time: bool | None
+    allocated_on_time: bool | None
+    acknowledgement_reason: str = Field(max_length=200)
+    allocation_reason: str = Field(max_length=200)
 
 
 class OperationError(Exception):

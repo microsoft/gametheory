@@ -14,6 +14,7 @@ from flood_lab import CONTRACT_VERSION
 from flood_lab.auth import Actor, current_actor
 from flood_lab.config import Settings, SetupRequired
 from flood_lab.contracts import (
+    MAX_WINDOW_SECONDS,
     AcknowledgeRequest,
     AcknowledgeRequestInput,
     AllocateRequest,
@@ -22,6 +23,7 @@ from flood_lab.contracts import (
     CreateRequestInput,
     ErrorView,
     EventList,
+    MilestonesView,
     MutationView,
     OperationError,
     RequestList,
@@ -50,6 +52,22 @@ ActorDependency = Annotated[Actor, Depends(current_actor)]
 ServiceDependency = Annotated[LabService, Depends(service)]
 Limit = Annotated[int, Query(ge=1, le=100)]
 After = Annotated[int, Query(ge=0, le=9223372036854775806)]
+AcknowledgeWithin = Annotated[
+    int,
+    Query(
+        ge=1,
+        le=MAX_WINDOW_SECONDS,
+        description="Inclusive acknowledgement deadline, in seconds after committed creation.",
+    ),
+]
+AllocateWithin = Annotated[
+    int,
+    Query(
+        ge=1,
+        le=MAX_WINDOW_SECONDS,
+        description="Inclusive full-allocation deadline, in seconds after committed creation.",
+    ),
+]
 IdempotencyHeader = Annotated[
     str,
     Header(
@@ -267,6 +285,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         record = lab.request(actor, run_id, request_id)
         return JSONResponse(
             record.model_dump(mode="json"), headers={"ETag": f'"{record.record_version}"'}
+        )
+
+    @app.get(
+        "/v1/runs/{run_id}/requests/{request_id}/milestones",
+        response_model=MilestonesView,
+        responses=errors,
+    )
+    def request_milestones(
+        run_id: UUID,
+        request_id: UUID,
+        actor: ActorDependency,
+        lab: ServiceDependency,
+        acknowledge_within_seconds: AcknowledgeWithin,
+        allocate_within_seconds: AllocateWithin,
+    ):
+        return lab.milestones(
+            actor, run_id, request_id, acknowledge_within_seconds, allocate_within_seconds
         )
 
     @app.post(

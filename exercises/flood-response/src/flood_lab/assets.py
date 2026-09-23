@@ -8,11 +8,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from flood_lab.contracts import MAX_WINDOW_SECONDS, MILESTONES_CONTRACT_VERSION
 from flood_lab.openapi import artifact as openapi_artifact
 from flood_lab.profile import PERSONNEL, PROFILE, SHELTERS, seed_manifest
 
 ROOT = Path(__file__).resolve().parents[2]
-ASSET_VERSION = "1.1.0"
+ASSET_VERSION = "1.2.0"
 
 
 def json_bytes(value: Any) -> bytes:
@@ -76,6 +77,31 @@ def catalogs() -> dict[str, dict]:
         field("quantity_allocated", "integer", minimum=0, maximum=10000),
         field("created_at", "datetime"),
         field("needed_by", "datetime"),
+    ]
+    milestone_results = [
+        field("contract_version", "string", choices=[MILESTONES_CONTRACT_VERSION]),
+        request,
+        run,
+        field("record_version", "string", max_length=35),
+        field("status", "string", choices=["open", "acknowledged", "fulfilled"]),
+        field("quantity_requested", "integer", minimum=1, maximum=10000),
+        field("quantity_allocated", "integer", minimum=0, maximum=10000),
+        field("created_at", "datetime"),
+        field("created_event_id", "uuid", required=False),
+        field("acknowledged", "boolean"),
+        field("acknowledged_at", "datetime", required=False),
+        field("acknowledgement_event_id", "uuid", required=False),
+        field("allocated_total_by_deadline", "integer", minimum=0, maximum=10000),
+        field("allocation_completed_at", "datetime", required=False),
+        field("allocation_completed_event_id", "uuid", required=False),
+        field("allocation_event_count", "integer", minimum=0, maximum=10000),
+        field("acknowledgement_deadline", "datetime"),
+        field("allocation_deadline", "datetime"),
+        field("as_of", "datetime"),
+        field("acknowledged_on_time", "boolean", required=False),
+        field("allocated_on_time", "boolean", required=False),
+        field("acknowledgement_reason", "string", max_length=200),
+        field("allocation_reason", "string", max_length=200),
     ]
     request_path = "/v1/runs/{run_id}/requests/{request_id}"
     recovery = (
@@ -182,6 +208,29 @@ def catalogs() -> dict[str, dict]:
             [*request_result, *evidence, field("allocation_id", "uuid")],
             recovery + " Participant-only. The reserved expected_version value is unquoted; "
             "transport adds ETag quotes for If-Match and does not send it in JSON.",
+        ),
+        operation(
+            "resource-request.milestones",
+            "Read authoritative request milestones",
+            "read",
+            {"kind": "rest", "method": "GET", "path": request_path + "/milestones"},
+            [
+                run,
+                request,
+                field(
+                    "acknowledge_within_seconds", "integer", minimum=1, maximum=MAX_WINDOW_SECONDS
+                ),
+                field("allocate_within_seconds", "integer", minimum=1, maximum=MAX_WINDOW_SECONDS),
+            ],
+            milestone_results,
+            "Read-only. The authenticated actor must hold an unexpired grant for the run. "
+            "Both windows are query fields and count inclusively from committed created_at. "
+            "One consistent read uses durable lab events and the lab database clock (as_of). "
+            "Verdict true: the milestone committed at or before its deadline. False: a late "
+            "committed action, or a committed partial allocation still short after the "
+            "deadline with complete lab history. Null: undecided, inconsistent or absent; "
+            "absence alone is not lateness. Seeded requests have no request.create event, so "
+            "their verdicts stay null. A decided verdict does not change.",
         ),
     ]
     graph = [

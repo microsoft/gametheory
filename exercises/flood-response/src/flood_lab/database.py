@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import Engine, create_engine, text
@@ -10,6 +11,15 @@ from sqlalchemy.orm import Session, sessionmaker
 from flood_lab import CONTRACT_VERSION
 from flood_lab.config import SetupRequired, database_target
 from flood_lab.models import DatabaseIdentity
+
+RUN_LOCKS = {
+    mode: text(
+        "DECLARE @rc int; EXEC @rc = sys.sp_getapplock "
+        f"@Resource=:resource, @LockMode='{mode}', @LockOwner='Transaction', "
+        "@LockTimeout=5000; SELECT @rc;"
+    )
+    for mode in ("Exclusive", "Shared")
+}
 
 
 def make_engine(url: str, expected_name: str) -> Engine:
@@ -46,15 +56,14 @@ def utc_now(session: Session) -> datetime:
     return value.replace(tzinfo=UTC)
 
 
-def lock_run(session: Session, run_id: UUID) -> None:
+def lock_run(
+    session: Session, run_id: UUID, mode: Literal["Exclusive", "Shared"] = "Exclusive"
+) -> None:
     # Every sanctioned writer takes the same transaction-owned lock, including SQL injectors.
+    # Timed-evidence readers take it shared, so no writer that already read the clock can
+    # commit an older timestamp after a reader's as_of.
     result = session.execute(
-        text(
-            "DECLARE @rc int; EXEC @rc = sys.sp_getapplock "
-            "@Resource=:resource, @LockMode='Exclusive', @LockOwner='Transaction', "
-            "@LockTimeout=5000; SELECT @rc;"
-        ),
-        {"resource": f"flood:run:{str(run_id).lower()}"},
+        RUN_LOCKS[mode], {"resource": f"flood:run:{str(run_id).lower()}"}
     ).scalar_one()
     if result < 0:
         raise TimeoutError("Run is busy; reconcile using the same idempotency key.")

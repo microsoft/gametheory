@@ -8,7 +8,7 @@ from sqlalchemy.exc import OperationalError
 from flood_lab.api import create_app, service
 from flood_lab.auth import Actor, current_actor
 from flood_lab.config import Settings
-from flood_lab.contracts import EventList, RequestList, RunList, version_value
+from flood_lab.contracts import EventList, MilestonesView, RequestList, RunList, version_value
 from flood_lab.service import OperationResponse
 
 RUN, RECORD, VERSION = uuid4(), uuid4(), version_value(uuid4())
@@ -21,6 +21,9 @@ class TestOnlyService:
 
     __test__ = False
 
+    def __init__(self):
+        self.milestone_calls = []
+
     def list_runs(self, *args):
         return RunList(items=[], next_offset=None)
 
@@ -29,6 +32,34 @@ class TestOnlyService:
 
     def events(self, *args):
         return EventList(items=[], next_after=None)
+
+    def milestones(self, actor, run_id, request_id, acknowledge_within, allocate_within):
+        now = datetime(2030, 1, 1, tzinfo=UTC)
+        self.milestone_calls.append((run_id, request_id, acknowledge_within, allocate_within))
+        return MilestonesView(
+            request_id=request_id,
+            run_id=run_id,
+            record_version=VERSION,
+            status="open",
+            quantity_requested=4,
+            quantity_allocated=0,
+            created_at=now,
+            created_event_id=None,
+            acknowledged=False,
+            acknowledged_at=None,
+            acknowledgement_event_id=None,
+            allocated_total_by_deadline=0,
+            allocation_completed_at=None,
+            allocation_completed_event_id=None,
+            allocation_event_count=0,
+            acknowledgement_deadline=now,
+            allocation_deadline=now,
+            as_of=now,
+            acknowledged_on_time=None,
+            allocated_on_time=None,
+            acknowledgement_reason="TEST ONLY transport fixture",
+            allocation_reason="TEST ONLY transport fixture",
+        )
 
     def acknowledge(self, actor, run_id, request_id, body, correlation_id):
         return OperationResponse(
@@ -86,6 +117,37 @@ def test_bounded_read_endpoints(client):
         response = client.get(f"/v1/runs/{RUN}/requests?{query}")
         assert response.status_code == 422
     assert client.get(f"/v1/runs/{RUN}/events?limit=101").status_code == 422
+
+
+def test_milestone_windows_are_required_bounded_integer_query_fields(client):
+    fixture = TestOnlyService()
+    client.app.dependency_overrides[service] = lambda: fixture
+    path = f"/v1/runs/{RUN}/requests/{RECORD}/milestones"
+    response = client.get(
+        path, params={"acknowledge_within_seconds": 1, "allocate_within_seconds": 604800}
+    )
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["contract_version"] == "flood-lab-milestones/v1"
+    assert response.json()["acknowledged_on_time"] is None
+    assert fixture.milestone_calls == [(RUN, RECORD, 1, 604800)]
+    for query in (
+        {},
+        {"acknowledge_within_seconds": 600},
+        {"allocate_within_seconds": 1200},
+        {"acknowledge_within_seconds": 0, "allocate_within_seconds": 1200},
+        {"acknowledge_within_seconds": 600, "allocate_within_seconds": 604801},
+        {"acknowledge_within_seconds": "1.5", "allocate_within_seconds": 1200},
+        {"acknowledge_within_seconds": "true", "allocate_within_seconds": 1200},
+        {"acknowledge_within_seconds": "", "allocate_within_seconds": 1200},
+    ):
+        response = client.get(path, params=query)
+        assert response.status_code == 422, query
+        assert response.json()["code"] == "invalid_request"
+    invalid_record = f"/v1/runs/{RUN}/requests/not-a-uuid/milestones"
+    valid_windows = {"acknowledge_within_seconds": 600, "allocate_within_seconds": 1200}
+    assert client.get(invalid_record, params=valid_windows).status_code == 422
+    assert len(fixture.milestone_calls) == 1
 
 
 def test_if_match_is_strong_and_protocol_parameters_are_not_json(client):

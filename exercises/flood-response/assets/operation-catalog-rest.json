@@ -461,6 +461,180 @@
         }
       ],
       "recovery": "No automatic undo. Reconcile unknown outcomes with the identical actor, run, operation, key, payload and expected version. Operator recovery retires only unchanged seed-owned records; participant changes, other operations and durable evidence are retained. Participant-only. The reserved expected_version value is unquoted; transport adds ETag quotes for If-Match and does not send it in JSON."
+    },
+    {
+      "key": "resource-request.milestones",
+      "version": "1",
+      "label": "Read authoritative request milestones",
+      "effect": "read",
+      "invocation": {
+        "kind": "rest",
+        "method": "GET",
+        "path": "/v1/runs/{run_id}/requests/{request_id}/milestones"
+      },
+      "parameters": [
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "request_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "acknowledge_within_seconds",
+          "type": "integer",
+          "required": true,
+          "minimum": 1,
+          "maximum": 604800
+        },
+        {
+          "name": "allocate_within_seconds",
+          "type": "integer",
+          "required": true,
+          "minimum": 1,
+          "maximum": 604800
+        }
+      ],
+      "results": [
+        {
+          "name": "contract_version",
+          "type": "string",
+          "required": true,
+          "choices": [
+            "flood-lab-milestones/v1"
+          ]
+        },
+        {
+          "name": "request_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "run_id",
+          "type": "uuid",
+          "required": true
+        },
+        {
+          "name": "record_version",
+          "type": "string",
+          "required": true,
+          "max_length": 35
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": true,
+          "choices": [
+            "open",
+            "acknowledged",
+            "fulfilled"
+          ]
+        },
+        {
+          "name": "quantity_requested",
+          "type": "integer",
+          "required": true,
+          "minimum": 1,
+          "maximum": 10000
+        },
+        {
+          "name": "quantity_allocated",
+          "type": "integer",
+          "required": true,
+          "minimum": 0,
+          "maximum": 10000
+        },
+        {
+          "name": "created_at",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "name": "created_event_id",
+          "type": "uuid",
+          "required": false
+        },
+        {
+          "name": "acknowledged",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "acknowledged_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "name": "acknowledgement_event_id",
+          "type": "uuid",
+          "required": false
+        },
+        {
+          "name": "allocated_total_by_deadline",
+          "type": "integer",
+          "required": true,
+          "minimum": 0,
+          "maximum": 10000
+        },
+        {
+          "name": "allocation_completed_at",
+          "type": "datetime",
+          "required": false
+        },
+        {
+          "name": "allocation_completed_event_id",
+          "type": "uuid",
+          "required": false
+        },
+        {
+          "name": "allocation_event_count",
+          "type": "integer",
+          "required": true,
+          "minimum": 0,
+          "maximum": 10000
+        },
+        {
+          "name": "acknowledgement_deadline",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "name": "allocation_deadline",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "name": "as_of",
+          "type": "datetime",
+          "required": true
+        },
+        {
+          "name": "acknowledged_on_time",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "allocated_on_time",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "acknowledgement_reason",
+          "type": "string",
+          "required": true,
+          "max_length": 200
+        },
+        {
+          "name": "allocation_reason",
+          "type": "string",
+          "required": true,
+          "max_length": 200
+        }
+      ],
+      "recovery": "Read-only. The authenticated actor must hold an unexpired grant for the run. Both windows are query fields and count inclusively from committed created_at. One consistent read uses durable lab events and the lab database clock (as_of). Verdict true: the milestone committed at or before its deadline. False: a late committed action, or a committed partial allocation still short after the deadline with complete lab history. Null: undecided, inconsistent or absent; absence alone is not lateness. Seeded requests have no request.create event, so their verdicts stay null. A decided verdict does not change."
     }
   ]
 }
