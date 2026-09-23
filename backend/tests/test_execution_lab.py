@@ -766,7 +766,9 @@ def test_real_lab_milestones_assess_timed_objectives_from_authoritative_evidence
     final = drive(case, run, completed)
     result = step(final, draft.milestones)["result"]
     assert result["acknowledged_on_time"] is False
-    assert result["acknowledged_at"] > result["acknowledgement_deadline"]
+    assert datetime.fromisoformat(result["acknowledged_at"]) > datetime.fromisoformat(
+        result["acknowledgement_deadline"]
+    )
     assert verdicts(case, final)["acknowledged"] == "unmet"
     assert verdicts(case, final)["source"] == "unmet"
 
