@@ -410,3 +410,172 @@ def test_recovery_uses_recorded_preconditions_and_manual_reports_are_not_verifie
         == "manually_accounted"
     )
     assert len(calls) == (2 if automatic else 1)
+
+
+def preflight(case, body=None, version=None):
+    return case.client.post(
+        case.board_path + "/runs/preflight",
+        headers={"If-Match": f'"{version or case.board_version}"'},
+        json={
+            "preview_id": case.preview["id"],
+            "preview_digest": case.preview["digest"],
+        }
+        | (body or {}),
+    )
+
+
+def persisted_counts(factory, wid):
+    from sqlalchemy import func
+
+    from gametheory.persistence import Audit, RunAuthorization, RunEvent
+
+    with factory() as db:
+        runs = select(ExerciseRun.id).where(ExerciseRun.workspace_id == wid)
+        return (
+            db.scalar(
+                select(func.count()).select_from(ExerciseRun).where(ExerciseRun.id.in_(runs))
+            ),
+            db.scalar(select(func.count()).select_from(RunEvent).where(RunEvent.run_id.in_(runs))),
+            db.scalar(
+                select(func.count())
+                .select_from(RunAuthorization)
+                .where(RunAuthorization.run_id.in_(runs))
+            ),
+            db.scalar(select(func.count()).select_from(RunStep).where(RunStep.run_id.in_(runs))),
+            db.scalar(select(func.count()).select_from(Audit).where(Audit.workspace_id == wid)),
+        )
+
+
+def test_preflight_evaluates_a_proposed_run_without_persisting_anything(
+    sql_client, sql_factory, monkeypatch, tmp_path
+):
+    case = execution_case(sql_client, sql_factory, monkeypatch, tmp_path)
+    before = persisted_counts(sql_factory, case.wid)
+    sid = case.draft["steps"][0]["id"]
+    checked = require(
+        preflight(
+            case,
+            {
+                "observations": [
+                    {
+                        "step_id": sid,
+                        "field": "quantity",
+                        "operator": "gt",
+                        "value": 85,
+                        "interval_seconds": 5,
+                        "timeout_seconds": 60,
+                        "max_samples": 12,
+                    }
+                ]
+            },
+        )
+    )
+    assert checked["valid"] is True
+    assert checked["issues"] == [] and checked["blockers"] == []
+    assert checked["approval_required"] is False
+    assert checked["planned_attempts"] == 12 and checked["max_operations"] == 1000
+    assert [item["execution_enabled"] for item in checked["environments"]] == [True]
+    [target] = checked["targets"]
+    assert target["configuration_id"] == case.config["id"]
+    assert target["authority"]["client_id"] == str(case.target.client_id)
+    assert target["authority"]["identity_ref"] == case.target.identity_ref
+    assert target["readiness"]["evidence_reference"] == "fixture:sql-app-authorization-only"
+    assert checked["recovery"] == []
+    assert persisted_counts(sql_factory, case.wid) == before
+
+
+def test_preflight_locates_binding_issues_and_explains_current_blockers(
+    sql_client, sql_factory, monkeypatch, tmp_path
+):
+    case = execution_case(sql_client, sql_factory, monkeypatch, tmp_path)
+    sid = case.draft["steps"][0]["id"]
+    body = {
+        "observations": [
+            {"step_id": sid, "field": "invented", "operator": "eq", "value": 1},
+        ]
+    }
+    checked = require(preflight(case, body))
+    assert checked["valid"] is False
+    assert [(item["section"], item["index"], item["code"]) for item in checked["issues"]] == [
+        ("observations", 0, "observation_field_undeclared")
+    ]
+    assert checked["blockers"] == []
+    require(
+        case.client.put(
+            case.policy_path,
+            headers={"If-Match": '"2"'},
+            json={
+                "classification": "nonproduction",
+                "execution_enabled": False,
+                "approval_required": False,
+            },
+        )
+    )
+    case.bindings_path.write_text("[]")
+    blocked = require(preflight(case))
+    codes = {item["code"]: item for item in blocked["blockers"]}
+    assert codes["environment_execution_disabled"]["remedy"] == "environment_policy"
+    assert codes["environment_execution_disabled"]["configuration_id"] == case.config["id"]
+    assert blocked["valid"] is True
+    assert blocked["targets"][0]["authority"] is None
+    created = require(case.client.get(case.run_path))
+    assert "authorization_required" in {item["code"] for item in created["blocker_details"]}
+    assert len(created["blocker_details"]) == len(created["blockers"])
+
+
+def test_preflight_requires_an_operator_and_the_exact_current_preview(
+    sql_client, sql_factory, monkeypatch, tmp_path
+):
+    case = execution_case(sql_client, sql_factory, monkeypatch, tmp_path)
+    assert (
+        case.client.post(
+            case.board_path + "/runs/preflight",
+            json={"preview_id": case.preview["id"], "preview_digest": case.preview["digest"]},
+        ).status_code
+        == 428
+    )
+    assert preflight(case, {"preview_digest": "0" * 64}).status_code == 409
+    viewer = Principal(case.actor.tenant, str(uuid4()))
+    require(
+        case.client.put(
+            case.workspace + "/members", json={"object_id": viewer.object_id, "role": "viewer"}
+        )
+    )
+    app.dependency_overrides[authenticate] = lambda: viewer
+    assert preflight(case).status_code == 403
+    app.dependency_overrides[authenticate] = lambda: case.actor
+    board = require(case.client.get(case.board_path))
+    saved = require(
+        case.client.put(
+            case.board_path,
+            headers={"If-Match": f'"{board["version"]}"'},
+            json={**board["draft"], "name": "Edited after preview"},
+        )
+    )
+    assert preflight(case).status_code == 409
+    assert preflight(case, version=saved["version"]).status_code == 409
+    windowless = require(
+        case.client.put(
+            case.board_path,
+            headers={"If-Match": f'"{saved["version"]}"'},
+            json={**saved["draft"], "window": None},
+        )
+    )
+    frozen = require(
+        case.client.post(
+            case.board_path + "/previews",
+            headers={"If-Match": f'"{windowless["version"]}"'},
+        ),
+        201,
+    )
+    checked = require(
+        case.client.post(
+            case.board_path + "/runs/preflight",
+            headers={"If-Match": f'"{windowless["version"]}"'},
+            json={"preview_id": frozen["id"], "preview_digest": frozen["digest"]},
+        )
+    )
+    assert checked["valid"] is False
+    assert [item["code"] for item in checked["issues"]] == ["missing_operations_or_window"]
+    assert "window_ended" not in {item["code"] for item in checked["blockers"]}
+    assert checked["window_starts_at"] is None and checked["window_ends_at"] is None

@@ -34,17 +34,9 @@ export function PreparationBoardContent({ wid, bid }: { wid: string; bid: string
   const [base, setBase] = useState<BoardView>()
   const [draft, setDraft] = useState<BoardDraft>()
   const [pane, setPane] = useState<'draft' | 'preview' | 'history' | 'runs'>('draft')
+  // Run setup lives here so switching tabs, for example to fix a preparation value, keeps it.
   const [runInput, setRunInput] = useState(emptyRunSetup)
   function changePane(next: typeof pane) {
-    if (
-      pane === 'runs' &&
-      next !== 'runs' &&
-      runInput.dirty &&
-      !window.confirm(
-        'Discard unsaved run bindings? Export local input before leaving this section.',
-      )
-    )
-      return
     setPane(next)
   }
   const [selectedPreviewId, setSelectedPreviewId] = useState('')
@@ -421,7 +413,9 @@ export function PreparationBoardContent({ wid, bid }: { wid: string; bid: string
         <div className="stack">
           {pane === 'runs' && (
             <BoardRuns
+              input={runInput}
               onInputChange={setRunInput}
+              onOpenPreparation={() => changePane('draft')}
               wid={wid}
               bid={bid}
               version={base.version}

@@ -601,6 +601,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workspaces/{wid}/boards/{bid}/runs/preflight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preflight Run
+         * @description Check a proposed run without creating, authorizing, or dispatching anything.
+         */
+        post: operations["preflight_run_api_workspaces__wid__boards__bid__runs_preflight_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/workspaces/{wid}/runs/{rid}": {
         parameters: {
             query?: never;
@@ -1213,6 +1233,31 @@ export interface components {
             /** Granted At */
             granted_at: string;
         };
+        /**
+         * ExecutionIssue
+         * @description One reason a pinned preparation and its run bindings are not executable.
+         */
+        ExecutionIssue: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Section
+             * @enum {string}
+             */
+            section: "preparation" | "observations" | "objectives" | "recovery";
+            /** Index */
+            index?: number | null;
+            /** Step Id */
+            step_id?: string | null;
+            /** Objective Id */
+            objective_id?: string | null;
+            /** Configuration Id */
+            configuration_id?: string | null;
+            /** Field */
+            field?: string | null;
+        };
         /** FlowEdge */
         FlowEdge: {
             /**
@@ -1516,6 +1561,51 @@ export interface components {
             x: number;
             /** Y */
             y: number;
+        };
+        /** PreflightRecovery */
+        PreflightRecovery: {
+            /**
+             * Step Id
+             * Format: uuid
+             */
+            step_id: string;
+            /** Label */
+            label: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "automatic" | "manual";
+        };
+        /** PreflightTarget */
+        PreflightTarget: {
+            /**
+             * Configuration Id
+             * Format: uuid
+             */
+            configuration_id: string;
+            /** Connection Name */
+            connection_name: string;
+            /**
+             * Connection Kind
+             * @enum {string}
+             */
+            connection_kind: "sql" | "rest" | "graph";
+            /**
+             * Environment Id
+             * Format: uuid
+             */
+            environment_id: string;
+            /** Environment Name */
+            environment_name: string;
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "unknown" | "nonproduction" | "production";
+            authority: components["schemas"]["TargetAuthorityView"] | null;
+            readiness: components["schemas"]["ReadinessView"] | null;
+            latest_readiness: components["schemas"]["ReadinessView"] | null;
         };
         /** PreparationApprovalInput */
         PreparationApprovalInput: {
@@ -1870,6 +1960,25 @@ export interface components {
             /** Readiness */
             readiness: components["schemas"]["ReadinessView"][];
         };
+        /**
+         * RunBlocker
+         * @description A current reason an action is unavailable and who can resolve it.
+         */
+        RunBlocker: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /**
+             * Remedy
+             * @enum {string}
+             */
+            remedy: "workspace_access" | "run_access" | "runtime" | "target_bindings" | "preparation" | "environment_policy" | "readiness" | "assets" | "authorize" | "approval" | "run_state";
+            /** Environment Id */
+            environment_id?: string | null;
+            /** Configuration Id */
+            configuration_id?: string | null;
+        };
         /** RunControl */
         RunControl: {
             /**
@@ -1956,6 +2065,41 @@ export interface components {
              * @default 1000
              */
             max_operations: number;
+        };
+        /**
+         * RunPreflightView
+         * @description A non-mutating evaluation of a proposed run; it is never execution authority.
+         */
+        RunPreflightView: {
+            /** Valid */
+            valid: boolean;
+            /** Checked At */
+            checked_at: string;
+            /**
+             * Trigger
+             * @enum {string}
+             */
+            trigger: "manual" | "scheduled";
+            /** Window Starts At */
+            window_starts_at: string | null;
+            /** Window Ends At */
+            window_ends_at: string | null;
+            /** Max Operations */
+            max_operations: number;
+            /** Planned Attempts */
+            planned_attempts: number;
+            /** Approval Required */
+            approval_required: boolean | null;
+            /** Environments */
+            environments: components["schemas"]["EnvironmentPolicyView"][];
+            /** Targets */
+            targets: components["schemas"]["PreflightTarget"][];
+            /** Recovery */
+            recovery: components["schemas"]["PreflightRecovery"][];
+            /** Issues */
+            issues: components["schemas"]["ExecutionIssue"][];
+            /** Blockers */
+            blockers: components["schemas"]["RunBlocker"][];
         };
         /** RunStepView */
         RunStepView: {
@@ -2051,6 +2195,8 @@ export interface components {
             approval_status: "not_required" | "required" | "approved" | "rejected" | "invalid" | "unresolved";
             /** Blockers */
             blockers: string[];
+            /** Blocker Details */
+            blocker_details: components["schemas"]["RunBlocker"][];
             /** Can Operate */
             can_operate: boolean;
             /** Can Stop */
@@ -3946,6 +4092,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preflight_run_api_workspaces__wid__boards__bid__runs_preflight_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string | null;
+            };
+            path: {
+                wid: string;
+                bid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunPreflightView"];
                 };
             };
             /** @description Validation Error */

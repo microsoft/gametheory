@@ -72,6 +72,8 @@ export function ScalarParameter({
   onChange,
   context = '',
   opaqueVersion = false,
+  requirement,
+  clearable = true,
 }: {
   field: OperationField
   value: ScalarValue | undefined
@@ -79,6 +81,8 @@ export function ScalarParameter({
   onChange: (value: ScalarValue | undefined) => void
   context?: string
   opaqueVersion?: boolean
+  requirement?: string
+  clearable?: boolean
 }) {
   const id = useId()
   const error = scalarError(field, value, opaqueVersion)
@@ -132,7 +136,8 @@ export function ScalarParameter({
         />
       )}
       <p id={`${id}-hint`} className="preparation-note">
-        {field.type} · {field.required !== false ? 'Required by operation' : 'Optional'}
+        {field.type} ·{' '}
+        {requirement ?? (field.required !== false ? 'Required by operation' : 'Optional')}
         {field.minimum != null && ` · Minimum ${field.minimum}`}
         {field.maximum != null && ` · Maximum ${field.maximum}`}
         {field.max_length != null && ` · Up to ${field.max_length} characters`}
@@ -145,7 +150,7 @@ export function ScalarParameter({
           {error}
         </p>
       )}
-      {value !== undefined && !disabled && (
+      {clearable && value !== undefined && !disabled && (
         <button type="button" onClick={() => onChange(undefined)} aria-label={`Clear ${label}`}>
           Clear value
         </button>

@@ -212,4 +212,7 @@ def execution_case(
         settings=settings,
         target=target,
         bindings_path=path,
+        preview=frozen,
+        board_version=saved["version"],
+        draft=draft,
     )

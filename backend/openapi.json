@@ -3117,6 +3117,91 @@
         }
       }
     },
+    "/api/workspaces/{wid}/boards/{bid}/runs/preflight": {
+      "post": {
+        "tags": [
+          "Execution"
+        ],
+        "summary": "Preflight Run",
+        "description": "Check a proposed run without creating, authorizing, or dispatching anything.",
+        "operationId": "preflight_run_api_workspaces__wid__boards__bid__runs_preflight_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bid"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunPreflightView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{wid}/runs/{rid}": {
       "get": {
         "tags": [
@@ -4563,6 +4648,95 @@
         ],
         "title": "ExecutionGrantView"
       },
+      "ExecutionIssue": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "section": {
+            "type": "string",
+            "enum": [
+              "preparation",
+              "observations",
+              "objectives",
+              "recovery"
+            ],
+            "title": "Section"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index"
+          },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id"
+          },
+          "objective_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objective Id"
+          },
+          "configuration_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration Id"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "section"
+        ],
+        "title": "ExecutionIssue",
+        "description": "One reason a pinned preparation and its run bindings are not executable."
+      },
       "FlowEdge": {
         "properties": {
           "id": {
@@ -5382,6 +5556,119 @@
         ],
         "title": "Position"
       },
+      "PreflightRecovery": {
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Step Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "automatic",
+              "manual"
+            ],
+            "title": "Mode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "step_id",
+          "label",
+          "mode"
+        ],
+        "title": "PreflightRecovery"
+      },
+      "PreflightTarget": {
+        "properties": {
+          "configuration_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Configuration Id"
+          },
+          "connection_name": {
+            "type": "string",
+            "title": "Connection Name"
+          },
+          "connection_kind": {
+            "type": "string",
+            "enum": [
+              "sql",
+              "rest",
+              "graph"
+            ],
+            "title": "Connection Kind"
+          },
+          "environment_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Environment Id"
+          },
+          "environment_name": {
+            "type": "string",
+            "title": "Environment Name"
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "nonproduction",
+              "production"
+            ],
+            "title": "Classification"
+          },
+          "authority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetAuthorityView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "readiness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReadinessView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest_readiness": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReadinessView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "configuration_id",
+          "connection_name",
+          "connection_kind",
+          "environment_id",
+          "environment_name",
+          "classification",
+          "authority",
+          "readiness",
+          "latest_readiness"
+        ],
+        "title": "PreflightTarget"
+      },
       "PreparationApprovalInput": {
         "properties": {
           "preview_id": {
@@ -6125,6 +6412,68 @@
         ],
         "title": "RunAuthorizationView"
       },
+      "RunBlocker": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "remedy": {
+            "type": "string",
+            "enum": [
+              "workspace_access",
+              "run_access",
+              "runtime",
+              "target_bindings",
+              "preparation",
+              "environment_policy",
+              "readiness",
+              "assets",
+              "authorize",
+              "approval",
+              "run_state"
+            ],
+            "title": "Remedy"
+          },
+          "environment_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment Id"
+          },
+          "configuration_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "remedy"
+        ],
+        "title": "RunBlocker",
+        "description": "A current reason an action is unavailable and who can resolve it."
+      },
       "RunControl": {
         "properties": {
           "action": {
@@ -6341,6 +6690,121 @@
           "recovery"
         ],
         "title": "RunManifest"
+      },
+      "RunPreflightView": {
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "checked_at": {
+            "type": "string",
+            "title": "Checked At"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "scheduled"
+            ],
+            "title": "Trigger"
+          },
+          "window_starts_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Starts At"
+          },
+          "window_ends_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Ends At"
+          },
+          "max_operations": {
+            "type": "integer",
+            "title": "Max Operations"
+          },
+          "planned_attempts": {
+            "type": "integer",
+            "title": "Planned Attempts"
+          },
+          "approval_required": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Required"
+          },
+          "environments": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentPolicyView"
+            },
+            "type": "array",
+            "title": "Environments"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/PreflightTarget"
+            },
+            "type": "array",
+            "title": "Targets"
+          },
+          "recovery": {
+            "items": {
+              "$ref": "#/components/schemas/PreflightRecovery"
+            },
+            "type": "array",
+            "title": "Recovery"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutionIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          },
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/RunBlocker"
+            },
+            "type": "array",
+            "title": "Blockers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "valid",
+          "checked_at",
+          "trigger",
+          "window_starts_at",
+          "window_ends_at",
+          "max_operations",
+          "planned_attempts",
+          "approval_required",
+          "environments",
+          "targets",
+          "recovery",
+          "issues",
+          "blockers"
+        ],
+        "title": "RunPreflightView",
+        "description": "A non-mutating evaluation of a proposed run; it is never execution authority."
       },
       "RunStepView": {
         "properties": {
@@ -6579,6 +7043,13 @@
             "type": "array",
             "title": "Blockers"
           },
+          "blocker_details": {
+            "items": {
+              "$ref": "#/components/schemas/RunBlocker"
+            },
+            "type": "array",
+            "title": "Blocker Details"
+          },
           "can_operate": {
             "type": "boolean",
             "title": "Can Operate"
@@ -6630,6 +7101,7 @@
           "approval_required",
           "approval_status",
           "blockers",
+          "blocker_details",
           "can_operate",
           "can_stop",
           "can_review",

@@ -38,6 +38,8 @@ The new document-first, mineral/ocean studio provides:
   nonproduction approval is configurable and off by default.
 - A separate, opt-in SQL/REST executor with pinned runs, manual/scheduled starts,
   pause/stop, durable evidence, objective findings, and explicit recovery.
+- Guided run setup forms, a non-mutating check before creating a run, and a launch
+  checklist that explains every blocker and who can resolve it.
 
 **Execution is disabled by default and requires separate deployment configuration
 and authorized target readiness.** Publishing a revision, registering a connection, or approving a

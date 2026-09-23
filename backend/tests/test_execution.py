@@ -13,7 +13,16 @@ from sqlalchemy.exc import OperationalError
 from gametheory import execution_adapters as adapters
 from gametheory import execution_worker as worker
 from gametheory.domain import Objective, ScenarioContent
-from gametheory.execution import ObjectiveRule, Observation, ReadinessReceipt, RunManifest, compare
+from gametheory.execution import (
+    ObjectiveRule,
+    Observation,
+    ReadinessReceipt,
+    RecoveryBinding,
+    RunManifest,
+    compare,
+    execution_issues,
+    planned_attempts,
+)
 from gametheory.execution_adapters import AllowedOperation, TargetBinding
 from gametheory.execution_evidence import findings
 from gametheory.persistence import RunEvent, RunStep
@@ -22,6 +31,7 @@ from gametheory.preparation import (
     ConfigurationSnapshot,
     ConnectionConfiguration,
     OperationDefinition,
+    OperationField,
     PreparationManifest,
     PreparationStep,
     PreparationWindow,
@@ -254,6 +264,117 @@ def test_write_observation_and_fabricated_objective_fields_are_rejected():
     ]
     with pytest.raises(ValidationError, match="declared"):
         RunManifest.model_validate(document)
+
+
+def owned_recovery(sid, config_id, key="record.read"):
+    return RecoveryBinding.model_validate(
+        {
+            "step_id": sid,
+            "binding": {
+                "configuration_id": config_id,
+                "operation_key": key,
+                "operation_version": "1",
+            },
+            "parameters": {
+                "record_id": {"source_step_id": sid, "field": "record_version"},
+                "expected_version": {"source_step_id": sid, "field": "committed_at"},
+            },
+            "ownership_parameter": "record_id",
+            "version_parameter": "expected_version",
+        }
+    )
+
+
+def test_execution_issues_report_every_binding_problem_with_its_location():
+    manifest = example_manifest()
+    prep = manifest.preparation
+    sid = prep.draft.steps[0].id
+    objective = prep.scenario.content.objectives[0].id
+    observations = [
+        Observation(step_id=sid, field="quantity", operator="gt", value=85),
+        Observation(step_id=sid, field="quantity", operator="lt", value=10),
+    ]
+    objectives = [
+        ObjectiveRule(
+            objective_id=objective, step_id=sid, field="invented", operator="eq", value=1
+        ),
+        ObjectiveRule(objective_id=uuid4(), step_id=sid, field="quantity", operator="eq", value=1),
+    ]
+    recovery = [owned_recovery(sid, prep.configurations[0].id)]
+    issues = list(execution_issues(prep, observations, objectives, recovery))
+    assert [(item.section, item.index, item.code) for item in issues] == [
+        ("observations", 1, "duplicate_observation"),
+        ("objectives", 0, "objective_reference_undeclared"),
+        ("objectives", 1, "objective_unknown"),
+        ("recovery", 0, "recovery_binding_invalid"),
+    ]
+    assert issues[1].field == "invented" and issues[1].objective_id == objective
+    assert issues[3].step_id == sid
+    document = manifest.model_dump(mode="json") | {
+        "observations": [item.model_dump(mode="json") for item in observations],
+        "objectives": [item.model_dump(mode="json") for item in objectives],
+        "recovery": [item.model_dump(mode="json") for item in recovery],
+    }
+    with pytest.raises(ValidationError, match=issues[0].message):
+        RunManifest.model_validate(document)
+    assert list(execution_issues(prep, observations[:1], [], [])) == []
+
+
+def sql_write_manifest():
+    manifest = example_manifest(effect="write", kind="sql")
+    config = manifest.preparation.configurations[0]
+    operation = config.content.catalog.operations[0]
+    operation.parameters.append(
+        OperationField(name="idempotency_key", type="string", max_length=128)
+    )
+    config.digest = canonical_digest(config.content.model_dump(mode="json"))
+    return manifest
+
+
+@pytest.mark.parametrize(
+    "change,code",
+    [
+        (
+            lambda document: document["preparation"]["draft"].update(recovery=" "),
+            "missing_recovery_decision",
+        ),
+        (
+            lambda document: document["preparation"]["draft"]["steps"][0]["parameters"].update(
+                idempotency_key="literal-from-preparation"
+            ),
+            "sql_idempotency_literal",
+        ),
+        (
+            lambda document: document["preparation"]["draft"]["steps"][0]["parameters"].pop(
+                "record_id"
+            ),
+            "unresolved_parameter",
+        ),
+    ],
+)
+def test_first_execution_issue_is_exactly_the_validator_rejection(change, code):
+    document = sql_write_manifest().model_dump(mode="json")
+    change(document)
+    prep = PreparationManifest.model_validate(document["preparation"])
+    issues = list(execution_issues(prep, [], [], []))
+    assert issues[0].code == code
+    assert issues[0].section == "preparation"
+    if code != "missing_recovery_decision":
+        assert issues[0].step_id == prep.draft.steps[0].id
+    with pytest.raises(ValidationError) as rejected:
+        RunManifest.model_validate(document)
+    assert issues[0].message in str(rejected.value)
+
+
+def test_planned_attempts_count_bounded_samples_and_recovery():
+    manifest = example_manifest()
+    prep = manifest.preparation
+    sid = prep.draft.steps[0].id
+    assert planned_attempts(prep, [], []) == 1
+    observation = Observation(step_id=sid, field="quantity", operator="gt", value=1, max_samples=60)
+    assert planned_attempts(prep, [observation], []) == 60
+    recovery = [owned_recovery(sid, prep.configurations[0].id)]
+    assert planned_attempts(prep, [observation], recovery) == 61
 
 
 def test_target_binding_cannot_retarget_identity_or_operation():

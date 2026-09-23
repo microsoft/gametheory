@@ -1,12 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import golden from '../../../backend/tests/fixtures/guided-run-setup.json'
 import type { components } from './api.generated'
-import { createApi, SessionContext } from './api'
+import { ApiError, createApi, SessionContext } from './api'
 import { AdminSettings, PolicyEditor } from './AdminSettings'
-import { ExerciseRunContent, runOptions } from './ExerciseRuns'
+import {
+  BoardRuns,
+  emptyRunSetup,
+  ExerciseRunContent,
+  runOptions,
+  serviceMessage,
+  type RunSetupInput,
+} from './ExerciseRuns'
+import type { Preview } from './preparation'
 import type { Config } from './types'
 
 const config: Config = {
@@ -168,6 +177,7 @@ function runFixture() {
       preparation: {
         draft: { name: 'Fixture only', steps: [] },
         scenario: { content: { objectives: [] } },
+        configurations: [],
       },
     },
     steps: [],
@@ -268,5 +278,198 @@ describe('run controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Authorize under current policy' }))
     await waitFor(() => expect(screen.getByText('Run changed.')).toBeVisible())
     expect(screen.getByLabelText('Operator / reviewer note')).toHaveValue('Retain this note')
+  })
+})
+
+function goldenPreview() {
+  return {
+    id: 'golden-preview',
+    board_id: golden.preview_manifest.board_id,
+    board_version: 3,
+    sequence: 1,
+    digest: 'e'.repeat(64),
+    manifest: golden.preview_manifest,
+    findings: [],
+    created_by: 'author',
+    created_at: '2026-09-22T12:00:00Z',
+    is_current: true,
+    execution_authorized: false,
+    execution_eligible: false,
+  } as unknown as Preview
+}
+
+function preflightFixture(blockers: unknown[] = []) {
+  return {
+    valid: true,
+    checked_at: '2026-09-23T12:00:00Z',
+    trigger: 'manual',
+    window_starts_at: '2026-09-23T12:00:00Z',
+    window_ends_at: '2026-09-23T14:00:00Z',
+    max_operations: 1000,
+    planned_attempts: 64,
+    approval_required: true,
+    environments: [],
+    targets: [],
+    recovery: [],
+    issues: [],
+    blockers,
+  }
+}
+
+function BoardRunsHarness({ onCreate }: { onCreate?: () => void }) {
+  const [input, setInput] = useState<RunSetupInput>(emptyRunSetup)
+  return (
+    <>
+      <BoardRuns
+        wid="workspace"
+        bid="board"
+        version={3}
+        preview={goldenPreview()}
+        unsaved={false}
+        input={input}
+        onInputChange={setInput}
+        onOpenPreparation={() => onCreate?.()}
+      />
+      <output aria-label="Run setup dirty">{String(input.dirty)}</output>
+    </>
+  )
+}
+
+function boardFetch(responses: { preflight?: () => Response; create?: () => Response } = {}) {
+  return vi.fn(async (url: string, options: RequestInit = {}) => {
+    if (url.endsWith('/me'))
+      return new Response(JSON.stringify({ object_id: 'operator', organization_admin: false }))
+    if (url.endsWith('/execution-grants'))
+      return new Response(JSON.stringify([{ capability: 'operator', object_id: 'operator' }]))
+    if (url.endsWith('/runs/preflight'))
+      return responses.preflight?.() ?? new Response(JSON.stringify(preflightFixture()))
+    if (url.endsWith('/runs') && options.method === 'POST')
+      return responses.create?.() ?? new Response(JSON.stringify({ id: 'created-run' }))
+    if (url.endsWith('/runs')) return new Response('[]')
+    throw new Error(`Unhandled fixture request ${url}`)
+  })
+}
+
+describe('guided run setup', () => {
+  it('requires a current check before creating and marks it stale after an edit', async () => {
+    const fetch = boardFetch({
+      preflight: () =>
+        new Response(
+          JSON.stringify(
+            preflightFixture([
+              {
+                code: 'environment_execution_disabled',
+                message: 'Resource ticket API: Execution is not enabled for Training lab',
+                remedy: 'environment_policy',
+              },
+            ]),
+          ),
+        ),
+    })
+    vi.stubGlobal('fetch', fetch)
+    mount(<BoardRunsHarness />)
+    const create = await screen.findByRole('button', { name: 'Create pinned run' })
+    expect(create).toBeDisabled()
+    expect(await screen.findByText('Check the setup first.')).toBeVisible()
+    fireEvent.click(await screen.findByRole('button', { name: 'Check setup' }))
+    await screen.findByText(/Ask an organization administrator to update Settings → Environments/)
+    expect(screen.getByText(/Independent execution approval is required/)).toBeVisible()
+    await waitFor(() => expect(create).toBeEnabled())
+    const request = fetch.mock.calls.find(([url]) => String(url).endsWith('/preflight'))!
+    expect(new Headers(request[1]?.headers).get('If-Match')).toBe('"3"')
+    expect(JSON.parse(String(request[1]?.body))).toEqual({
+      preview_id: 'golden-preview',
+      preview_digest: 'e'.repeat(64),
+      trigger: 'manual',
+      observations: [],
+      objectives: [],
+      recovery: [],
+    })
+    fireEvent.click(screen.getByLabelText(/Automatically at the window start/))
+    expect(screen.getByLabelText('Run setup dirty')).toHaveTextContent('true')
+    expect(create).toBeDisabled()
+    expect(
+      screen.getByText(/The setup changed after the last check/, { selector: 'span' }),
+    ).toBeVisible()
+  })
+
+  it('keeps the run setup when creation conflicts', async () => {
+    vi.stubGlobal(
+      'fetch',
+      boardFetch({
+        create: () =>
+          new Response('{"detail":"Freeze and select the exact current preparation preview"}', {
+            status: 409,
+          }),
+      }),
+    )
+    mount(<BoardRunsHarness />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Add a check' }))
+    const reading = within(screen.getByRole('group', { name: 'Check 1' })).getByLabelText('Reading')
+    fireEvent.change(reading, { target: { value: 'occupancy_percent' } })
+    fireEvent.change(screen.getByLabelText('Compare with · occupancy_percent'), {
+      target: { value: '85' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Check setup' }))
+    await screen.findByText(/Ready to create/)
+    fireEvent.click(screen.getByRole('button', { name: 'Create pinned run' }))
+    await screen.findByText('Freeze and select the exact current preparation preview')
+    expect(screen.getByText(/Your run setup is kept/)).toBeVisible()
+    expect(reading).toHaveValue('occupancy_percent')
+    expect(screen.getByLabelText('Run setup dirty')).toHaveTextContent('true')
+  })
+
+  it('explains service validation errors in plain field paths', () => {
+    const error = serviceMessage(
+      new ApiError(422, '[]', [
+        {
+          loc: ['body', 'observations', 0, 'interval_seconds'],
+          msg: 'Input should be at most 3600',
+        },
+      ]),
+    )
+    expect((error as Error).message).toBe(
+      'observations → 0 → interval_seconds: Input should be at most 3600',
+    )
+  })
+})
+
+describe('run launch checklist', () => {
+  it('shows each blocker with who can resolve it', async () => {
+    const run = {
+      ...runFixture(),
+      blockers: [
+        'Exercise runtime is disabled',
+        'Authorize this exact run under the current environment policies',
+      ],
+      blocker_details: [
+        { code: 'runtime_disabled', message: 'Exercise runtime is disabled', remedy: 'runtime' },
+        {
+          code: 'authorization_required',
+          message: 'Authorize this exact run under the current environment policies',
+          remedy: 'authorize',
+        },
+      ],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async (url: string) =>
+          new Response(
+            JSON.stringify(
+              url.endsWith('/me')
+                ? { object_id: 'fixture-operator', organization_admin: true }
+                : run,
+            ),
+            { headers: { ETag: '"2"' } },
+          ),
+      ),
+    )
+    mount(<ExerciseRunContent wid="workspace" rid="fixture-run" />)
+    await screen.findByRole('heading', { name: 'Launch checklist' })
+    expect(screen.getByText(/deployment operator to enable it/)).toBeVisible()
+    expect(screen.getByText(/in Operator controls/)).toBeVisible()
+    expect(screen.getByText('Enter an operator note to enable these actions.')).toBeVisible()
+    expect(screen.getByText(/Up to 0 of 1,000/)).toBeVisible()
   })
 })

@@ -1,0 +1,604 @@
+{
+  "preview_manifest": {
+    "assets": [],
+    "board_id": "32000000-0000-4000-8000-000000000002",
+    "board_version": 3,
+    "configurations": [
+      {
+        "connection_id": "32000000-0000-4000-8000-000000000004",
+        "connection_kind": "sql",
+        "connection_name": "Capacity database",
+        "content": {
+          "catalog": {
+            "name": "Capacity records — golden fixture",
+            "operations": [
+              {
+                "effect": "write",
+                "invocation": {
+                  "kind": "sql",
+                  "procedure": "fixture.UpdateOccupancy"
+                },
+                "key": "capacity.update",
+                "label": "Set shelter occupancy",
+                "parameters": [
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "shelter_id",
+                    "required": true,
+                    "type": "uuid"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": 500,
+                    "minimum": 0,
+                    "name": "occupancy",
+                    "required": true,
+                    "type": "integer"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": 128,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "idempotency_key",
+                    "required": true,
+                    "type": "string"
+                  }
+                ],
+                "recovery": "Restore seeded occupancy only if the version still matches.",
+                "results": [
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "occupancy_percent",
+                    "required": true,
+                    "type": "number"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": 128,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "record_version",
+                    "required": true,
+                    "type": "string"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "outcome",
+                    "required": true,
+                    "type": "string"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "durable_event_id",
+                    "required": true,
+                    "type": "uuid"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "committed_at",
+                    "required": true,
+                    "type": "datetime"
+                  }
+                ],
+                "version": "2"
+              },
+              {
+                "effect": "read",
+                "invocation": {
+                  "kind": "sql",
+                  "procedure": "fixture.ReadOccupancy"
+                },
+                "key": "capacity.read",
+                "label": "Read shelter occupancy",
+                "parameters": [
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "shelter_id",
+                    "required": true,
+                    "type": "uuid"
+                  }
+                ],
+                "recovery": "Read-only; no target mutation.",
+                "results": [
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "occupancy_percent",
+                    "required": true,
+                    "type": "number"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "committed_at",
+                    "required": false,
+                    "type": "datetime"
+                  }
+                ],
+                "version": "2"
+              }
+            ],
+            "schema_version": "operation-catalog/v1"
+          },
+          "classification": "nonproduction",
+          "database": "exercise_fixture",
+          "endpoint": "sql.fixture.invalid",
+          "identity_ref": "fixture/sql/executor",
+          "notification": null,
+          "resource_id": "fixture/sql",
+          "schema_version": "connection-configuration/v1"
+        },
+        "created_at": "2026-09-22T12:00:00Z",
+        "created_by": "32000000-0000-4000-8000-000000000009",
+        "digest": "282e127443f185a447c2f6aec6d891c9c437ee32971c67e6902111b82392d4d8",
+        "environment_id": "32000000-0000-4000-8000-000000000008",
+        "environment_name": "Training lab",
+        "execution_authorized": false,
+        "id": "32000000-0000-4000-8000-000000000006",
+        "template_asset": null,
+        "version": 1,
+        "workspace_id": "32000000-0000-4000-8000-000000000001"
+      },
+      {
+        "connection_id": "32000000-0000-4000-8000-000000000005",
+        "connection_kind": "rest",
+        "connection_name": "Resource ticket API",
+        "content": {
+          "catalog": {
+            "name": "Resource tickets — golden fixture",
+            "operations": [
+              {
+                "effect": "write",
+                "invocation": {
+                  "kind": "rest",
+                  "method": "POST",
+                  "path": "/tickets"
+                },
+                "key": "ticket.create",
+                "label": "Open a resource ticket",
+                "parameters": [
+                  {
+                    "choices": null,
+                    "max_length": 80,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "title",
+                    "required": true,
+                    "type": "string"
+                  }
+                ],
+                "recovery": "Close the ticket only while unchanged and owned by this run.",
+                "results": [
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "record_id",
+                    "required": true,
+                    "type": "uuid"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "run_id",
+                    "required": true,
+                    "type": "uuid"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": 128,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "record_version",
+                    "required": true,
+                    "type": "string"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "created_at",
+                    "required": true,
+                    "type": "datetime"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "outcome",
+                    "required": true,
+                    "type": "string"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "durable_event_id",
+                    "required": true,
+                    "type": "uuid"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "committed_at",
+                    "required": true,
+                    "type": "datetime"
+                  }
+                ],
+                "version": "1"
+              },
+              {
+                "effect": "read",
+                "invocation": {
+                  "kind": "rest",
+                  "method": "GET",
+                  "path": "/tickets/{record_id}"
+                },
+                "key": "ticket.read",
+                "label": "Read a resource ticket",
+                "parameters": [
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "record_id",
+                    "required": true,
+                    "type": "uuid"
+                  }
+                ],
+                "recovery": "Read-only; no target mutation.",
+                "results": [
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "acknowledged",
+                    "required": true,
+                    "type": "boolean"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "acknowledged_at",
+                    "required": false,
+                    "type": "datetime"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": 128,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "record_version",
+                    "required": true,
+                    "type": "string"
+                  }
+                ],
+                "version": "1"
+              },
+              {
+                "effect": "write",
+                "invocation": {
+                  "kind": "rest",
+                  "method": "POST",
+                  "path": "/tickets/{record_id}/close"
+                },
+                "key": "ticket.close",
+                "label": "Close an exercise ticket",
+                "parameters": [
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "record_id",
+                    "required": true,
+                    "type": "uuid"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "run_id",
+                    "required": true,
+                    "type": "uuid"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": 128,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "expected_version",
+                    "required": true,
+                    "type": "string"
+                  }
+                ],
+                "recovery": "Closing is itself the recovery; human edits are preserved.",
+                "results": [
+                  {
+                    "choices": null,
+                    "max_length": 128,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "record_version",
+                    "required": true,
+                    "type": "string"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "outcome",
+                    "required": true,
+                    "type": "string"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "durable_event_id",
+                    "required": true,
+                    "type": "uuid"
+                  },
+                  {
+                    "choices": null,
+                    "max_length": null,
+                    "maximum": null,
+                    "minimum": null,
+                    "name": "committed_at",
+                    "required": true,
+                    "type": "datetime"
+                  }
+                ],
+                "version": "1"
+              }
+            ],
+            "schema_version": "operation-catalog/v1"
+          },
+          "classification": "nonproduction",
+          "database": "",
+          "endpoint": "https://tickets.fixture.invalid",
+          "identity_ref": "fixture/rest/executor",
+          "notification": null,
+          "resource_id": "fixture/rest",
+          "schema_version": "connection-configuration/v1"
+        },
+        "created_at": "2026-09-22T12:00:00Z",
+        "created_by": "32000000-0000-4000-8000-000000000009",
+        "digest": "d02583297e63c010d9c4e918cecc2225f6e334b3a1e1e24bd340b3fc59e0c798",
+        "environment_id": "32000000-0000-4000-8000-000000000008",
+        "environment_name": "Training lab",
+        "execution_authorized": false,
+        "id": "32000000-0000-4000-8000-000000000007",
+        "template_asset": null,
+        "version": 1,
+        "workspace_id": "32000000-0000-4000-8000-000000000001"
+      }
+    ],
+    "draft": {
+      "name": "Shelter surge drill",
+      "notification_budget": 0,
+      "recovery": "Close exercise tickets and restore seeded occupancy where unchanged.",
+      "schema_version": "exercise-preparation-draft/v1",
+      "steps": [
+        {
+          "authoring_node_id": null,
+          "binding": {
+            "configuration_id": "32000000-0000-4000-8000-000000000006",
+            "operation_key": "capacity.update",
+            "operation_version": "2"
+          },
+          "condition": null,
+          "depends_on": [],
+          "id": "32000000-0000-4000-8000-00000000000a",
+          "kind": "operation",
+          "label": "Raise occupancy",
+          "parameters": {
+            "occupancy": 108,
+            "shelter_id": "32000000-0000-4000-8000-000000000010"
+          },
+          "wait_seconds": null
+        },
+        {
+          "authoring_node_id": null,
+          "binding": {
+            "configuration_id": "32000000-0000-4000-8000-000000000006",
+            "operation_key": "capacity.read",
+            "operation_version": "2"
+          },
+          "condition": null,
+          "depends_on": [
+            "32000000-0000-4000-8000-00000000000a"
+          ],
+          "id": "32000000-0000-4000-8000-00000000000b",
+          "kind": "operation",
+          "label": "Read occupancy",
+          "parameters": {
+            "shelter_id": "32000000-0000-4000-8000-000000000010"
+          },
+          "wait_seconds": null
+        },
+        {
+          "authoring_node_id": null,
+          "binding": {
+            "configuration_id": "32000000-0000-4000-8000-000000000007",
+            "operation_key": "ticket.create",
+            "operation_version": "1"
+          },
+          "condition": null,
+          "depends_on": [
+            "32000000-0000-4000-8000-00000000000b"
+          ],
+          "id": "32000000-0000-4000-8000-00000000000c",
+          "kind": "operation",
+          "label": "Open resource ticket",
+          "parameters": {
+            "title": "EXERCISE ONLY — cots needed"
+          },
+          "wait_seconds": null
+        },
+        {
+          "authoring_node_id": null,
+          "binding": {
+            "configuration_id": "32000000-0000-4000-8000-000000000007",
+            "operation_key": "ticket.read",
+            "operation_version": "1"
+          },
+          "condition": null,
+          "depends_on": [
+            "32000000-0000-4000-8000-00000000000c"
+          ],
+          "id": "32000000-0000-4000-8000-00000000000d",
+          "kind": "operation",
+          "label": "Read ticket",
+          "parameters": {
+            "record_id": {
+              "field": "record_id",
+              "source_step_id": "32000000-0000-4000-8000-00000000000c"
+            }
+          },
+          "wait_seconds": null
+        }
+      ],
+      "window": {
+        "ends_at": "2026-09-23T14:00:00Z",
+        "starts_at": "2026-09-23T12:00:00Z"
+      }
+    },
+    "execution_authorized": false,
+    "scenario": {
+      "content": {
+        "asset_ids": [],
+        "document": {
+          "content": [
+            {
+              "type": "paragraph"
+            }
+          ],
+          "type": "doc"
+        },
+        "edges": [],
+        "nodes": [],
+        "objectives": [
+          {
+            "criterion": "Occupancy above 85% is observed within 2 minutes of the change.",
+            "id": "32000000-0000-4000-8000-00000000000e",
+            "title": "Breach identified quickly"
+          },
+          {
+            "criterion": "Someone acknowledges the ticket within 10 minutes of opening.",
+            "id": "32000000-0000-4000-8000-00000000000f",
+            "title": "Ticket acknowledged"
+          }
+        ],
+        "schema_version": 1,
+        "title": "Shelter surge"
+      },
+      "revision_version": 1,
+      "scenario_id": "32000000-0000-4000-8000-000000000003"
+    },
+    "schema_version": "exercise-preparation/v1",
+    "workspace_id": "32000000-0000-4000-8000-000000000001"
+  },
+  "run_create": {
+    "objectives": [
+      {
+        "anchor_field": "committed_at",
+        "anchor_step_id": "32000000-0000-4000-8000-00000000000a",
+        "field": "occupancy_percent",
+        "objective_id": "32000000-0000-4000-8000-00000000000e",
+        "operator": "gt",
+        "step_id": "32000000-0000-4000-8000-00000000000b",
+        "value": 85,
+        "within_seconds": 120
+      },
+      {
+        "anchor_field": "created_at",
+        "anchor_step_id": "32000000-0000-4000-8000-00000000000c",
+        "field": "acknowledged",
+        "objective_id": "32000000-0000-4000-8000-00000000000f",
+        "operator": "eq",
+        "source_time_field": "acknowledged_at",
+        "step_id": "32000000-0000-4000-8000-00000000000d",
+        "value": true,
+        "within_seconds": 600
+      }
+    ],
+    "observations": [
+      {
+        "field": "occupancy_percent",
+        "interval_seconds": 10,
+        "max_samples": 60,
+        "operator": "gt",
+        "step_id": "32000000-0000-4000-8000-00000000000b",
+        "timeout_seconds": 600,
+        "value": 85
+      }
+    ],
+    "recovery": [
+      {
+        "binding": {
+          "configuration_id": "32000000-0000-4000-8000-000000000007",
+          "operation_key": "ticket.close",
+          "operation_version": "1"
+        },
+        "ownership_parameter": "record_id",
+        "parameters": {
+          "expected_version": {
+            "field": "record_version",
+            "source_step_id": "32000000-0000-4000-8000-00000000000c"
+          },
+          "record_id": {
+            "field": "record_id",
+            "source_step_id": "32000000-0000-4000-8000-00000000000c"
+          },
+          "run_id": {
+            "field": "run_id",
+            "source_step_id": "32000000-0000-4000-8000-00000000000c"
+          }
+        },
+        "step_id": "32000000-0000-4000-8000-00000000000c",
+        "version_parameter": "expected_version"
+      }
+    ],
+    "trigger": "manual"
+  }
+}
