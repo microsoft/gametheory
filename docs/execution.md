@@ -48,8 +48,17 @@ An explicit operator creates a run from a current saved preview. The immutable
 effect manifest pins the scenario, assets, configurations, exact operation
 versions, inputs, trigger/window, observation bounds, objective rules, and
 recovery bindings. Later board/draft edits do not change an existing run.
-SQL idempotency keys are explicitly dispatcher-owned in this contract: clear any
-literal `idempotency_key` in the preparation before creating the run.
+SQL idempotency keys are explicitly dispatcher-owned in this contract. The
+preparation editor shows SQL `idempotency_key` as supplied automatically and
+offers to clear a typed value; the static preview lists it as unresolved, which is
+expected. Run setup blocks creation while a typed value remains.
+
+**Check before creating** (`POST .../boards/{bid}/runs/preflight`) evaluates the same
+`RunCreate` body against the exact current preview, environment policies, operator
+bindings, readiness receipts, and window. It returns every located setup issue and each
+current blocker with a remedy, then persists nothing: no run, authorization, event,
+audit record, or dispatch. It is advisory. Creation, authorization, start, and every
+dispatch recheck everything again.
 
 **Authorize under current policy** records a separate immutable authorization
 context containing policy versions, resolved target identity/configuration
@@ -127,15 +136,31 @@ pinned authorization context.
 
 ## Running and observing
 
-Use **Exercise runs** on a preparation board:
+Use **Exercise runs** on a preparation board. The guided forms read the pinned
+preview, so operators choose steps, declared results, and recorded values from
+lists instead of typing IDs or JSON:
 
-1. Select manual start or one-off scheduling at the pinned window's start.
-2. Optionally supply observations, objective bindings, and recovery bindings in
-   the restricted JSON editor. Export the preview to inspect exact IDs/contracts.
-3. Create the immutable run, inspect its blockers, and authorize current policy.
-4. Obtain a separate execution approval if required, then start/schedule.
-5. Inspect step results, the evidence timeline, and objective findings. Pause or
+1. Choose manual start or one-off scheduling at the pinned window's start.
+2. **Watch for a condition:** pick a read step, a declared reading, a typed
+   comparison, and explicit interval, give-up time, and check limits.
+3. **How each goal is judged:** for each pinned scenario objective, optionally pick
+   the evidence step/result and comparison, an optional time limit, the recorded
+   start time, and whether the system's own timestamp or the observation time
+   decides lateness. Unmeasured goals stay indeterminate.
+4. **Undo plan:** keep manual accounting, or bind a registered write whose
+   ownership and version checks come from the change's recorded results.
+5. **Check before creating**, fix anything listed, then create the immutable run.
+   Its **Launch checklist** shows the window, environments, approval requirement,
+   target identities, readiness expiry against the window, attempt budget, undo
+   plan, and every blocker with who can resolve it.
+6. Authorize current policy, obtain a separate execution approval if required,
+   then start/schedule.
+7. Inspect step results, the evidence timeline, and objective findings. Pause or
    stop when needed; use explicit safe reconciliation for uncertain operations.
+
+Run setup is kept while switching board tabs. **Settings file (advanced)** exports
+and imports the same `RunCreate` bindings; imported values fill the forms and are
+validated again. There is no second contract.
 
 The initial runtime executes a bounded acyclic graph serially, with at most one
 active run per board and at most 1,000 attempts across exercise and recovery.
@@ -145,7 +170,7 @@ starts use durable timers; controls signal them without restarting the run.
 Only reads can be polled, with explicit interval, timeout, and sample bounds.
 Notification/MCP steps are rejected, not skipped as if they succeeded.
 
-Observation binding shape:
+Observation binding shape in an exported settings file:
 
 ```json
 {

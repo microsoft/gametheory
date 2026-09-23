@@ -393,6 +393,10 @@ export function BoardEditor({
                             bound.operation.invocation.kind === 'rest' &&
                             field.name === 'expected_version'
                           }
+                          dispatcherOwned={
+                            bound.operation.invocation.kind === 'sql' &&
+                            field.name === 'idempotency_key'
+                          }
                           onChange={(value) => updateStep(step.id, value)}
                         />
                       ))}
@@ -469,6 +473,7 @@ function OperationParameter({
   editable,
   onChange,
   opaqueVersion,
+  dispatcherOwned,
 }: {
   field: import('./Catalog').OperationField
   step: PreparationStep
@@ -477,8 +482,42 @@ function OperationParameter({
   editable: boolean
   onChange: (step: PreparationStep) => void
   opaqueVersion: boolean
+  dispatcherOwned: boolean
 }) {
   const value = parameterValue(step, field.name)
+  if (dispatcherOwned)
+    return (
+      <fieldset>
+        <legend>
+          {field.name} · {field.type}
+        </legend>
+        <p className="preparation-note">
+          Supplied automatically during exercise runs: the executor derives a stable key for each
+          step and attempt. Leave this empty. The static preview lists it as unresolved, which is
+          expected.
+        </p>
+        {value != null && (
+          <div className="notice" role="status">
+            A typed value here would block run creation.{' '}
+            {editable && (
+              <button
+                type="button"
+                onClick={() =>
+                  onChange({
+                    ...step,
+                    parameters: Object.fromEntries(
+                      Object.entries(step.parameters ?? {}).filter(([name]) => name !== field.name),
+                    ),
+                  })
+                }
+              >
+                Clear {field.name}
+              </button>
+            )}
+          </div>
+        )}
+      </fieldset>
+    )
   const reference = isResultReference(value) ? value : undefined
   const literal = isResultReference(value) ? undefined : (value ?? undefined)
   const sources = steps

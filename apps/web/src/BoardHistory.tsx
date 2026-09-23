@@ -86,6 +86,22 @@ export function BoardProvenance({ board }: { board: BoardView }) {
   )
 }
 
+function dispatcherOwnedFinding(
+  finding: Preview['findings'][number],
+  manifest: Preview['manifest'],
+) {
+  if (
+    finding.code !== 'missing_parameter' ||
+    !finding.path?.endsWith('/parameters/idempotency_key')
+  )
+    return false
+  const binding = manifest.draft.steps?.find((step) => step.id === finding.step_id)?.binding
+  return (
+    manifest.configurations.find((item) => item.id === binding?.configuration_id)
+      ?.connection_kind === 'sql'
+  )
+}
+
 export function PreviewDetails({ preview }: { preview: Preview }) {
   const manifest = preview.manifest
   const liveCodes = new Set([
@@ -140,6 +156,12 @@ export function PreviewDetails({ preview }: { preview: Preview }) {
                 {finding.severity}
               </span>
               <p>{finding.message}</p>
+              {dispatcherOwnedFinding(finding, manifest) && (
+                <p className="preparation-note">
+                  Expected for SQL steps: exercise runs supply this key automatically, so leave it
+                  unresolved.
+                </p>
+              )}
               <code>
                 {finding.code}
                 {finding.path ? ` · ${finding.path}` : ''}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import type { components } from './api.generated'
@@ -6,29 +6,79 @@ import { ApiError, ErrorNotice, useSession } from './api'
 import { exportJson, UnsavedChanges } from './PreparationShared'
 import { timezoneDateTime, type Me, type Preview } from './preparation'
 import { parseUniqueJson } from './strictJson'
+import { PreflightResult, type RunPreflight } from './RunPreflight'
+import { goalId, RunSetupForm, undoId, watchId } from './RunSetupForm'
+import { LaunchChecklist } from './RunLaunchChecklist'
+import {
+  alignSetup,
+  emptySetup,
+  importSetup,
+  setupBindings,
+  setupModel,
+  setupProblems,
+  type RunSetupDraft,
+  type SetupProblem,
+} from './runSetup'
 
 type Schemas = components['schemas']
 type Run = Schemas['RunView']
 type Action = Schemas['RunControl']['action']
-const emptyBindings = '{\n  "observations": [],\n  "objectives": [],\n  "recovery": []\n}'
-export type RunSetupInput = { dirty: boolean; trigger: 'manual' | 'scheduled'; options: string }
-export const emptyRunSetup: RunSetupInput = {
-  dirty: false,
-  trigger: 'manual',
-  options: emptyBindings,
-}
+export type RunSetupInput = { dirty: boolean; draft?: RunSetupDraft }
+export const emptyRunSetup: RunSetupInput = { dirty: false }
 
 export function runOptions(text: string): Record<string, unknown> {
   const value = parseUniqueJson(text)
   if (typeof value !== 'object' || value === null || Array.isArray(value))
-    throw new Error('Run bindings must be a JSON object.')
+    throw new Error('Run settings must be a JSON object.')
   const result: Record<string, unknown> = {}
   for (const [key, item] of Object.entries(value)) {
+    if (key === 'trigger' && (item === 'manual' || item === 'scheduled')) {
+      result[key] = item
+      continue
+    }
     if (!['observations', 'objectives', 'recovery'].includes(key) || !Array.isArray(item))
-      throw new Error('Only observations, objectives, and recovery arrays are accepted.')
+      throw new Error(
+        'Only a trigger and observations, objectives, and recovery arrays are accepted.',
+      )
     result[key] = item
   }
   return result
+}
+
+export function hasSetupInput(draft: RunSetupDraft) {
+  return (
+    draft.trigger !== 'manual' ||
+    draft.watches.length > 0 ||
+    draft.goals.some((goal) => goal.measured) ||
+    draft.undo.some((undo) => undo.mode !== 'manual')
+  )
+}
+
+export function serviceMessage(error: unknown): unknown {
+  if (!(error instanceof ApiError) || error.status !== 422 || !Array.isArray(error.detail))
+    return error
+  const lines = error.detail.flatMap((item: unknown) => {
+    if (typeof item !== 'object' || item === null) return []
+    const { loc, msg } = item as { loc?: unknown; msg?: unknown }
+    const where = Array.isArray(loc) ? loc.filter((part) => part !== 'body').join(' → ') : ''
+    return typeof msg === 'string' ? [where ? `${where}: ${msg}` : msg] : []
+  })
+  return lines.length ? new ApiError(422, lines.join('; '), error.detail) : error
+}
+
+function focusSetup(
+  section: SetupProblem['section'] | 'observations' | 'objectives' | 'recovery',
+  key: string,
+) {
+  const id =
+    section === 'watch' || section === 'observations'
+      ? watchId(key)
+      : section === 'goal' || section === 'objectives'
+        ? goalId(key)
+        : undoId(key)
+  const target = document.getElementById(id)
+  target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  target?.querySelector<HTMLElement>('select, input, button')?.focus({ preventScroll: true })
 }
 
 export function BoardRuns({
@@ -37,20 +87,25 @@ export function BoardRuns({
   version,
   preview,
   unsaved,
+  input,
   onInputChange,
+  onOpenPreparation,
 }: {
   wid: string
   bid: string
   version: number
   preview?: Preview
   unsaved: boolean
-  onInputChange?: (input: RunSetupInput) => void
+  input: RunSetupInput
+  onInputChange: (input: RunSetupInput) => void
+  onOpenPreparation: () => void
 }) {
   const { api } = useSession()
   const cache = useQueryClient()
-  const [trigger, setTrigger] = useState<'manual' | 'scheduled'>('manual')
-  const [options, setOptions] = useState(emptyBindings)
   const [createdId, setCreatedId] = useState('')
+  const [importNotes, setImportNotes] = useState<string[]>([])
+  const [importError, setImportError] = useState<unknown>()
+  const [check, setCheck] = useState<{ fingerprint: string; result: RunPreflight }>()
   const path = `/workspaces/${wid}/boards/${bid}/runs`
   const runs = useQuery({
     queryKey: [wid, 'board-runs', bid],
@@ -65,140 +120,279 @@ export function BoardRuns({
   const operator =
     !grants.error &&
     !me.error &&
-    grants.data?.some(
+    !!grants.data?.some(
       (item) => item.capability === 'operator' && item.object_id === me.data?.object_id,
     )
+  const admin = !!me.data?.organization_admin
+  const model = useMemo(() => (preview ? setupModel(preview) : undefined), [preview])
+  const draft = useMemo(
+    () => (model ? alignSetup(input.draft ?? emptySetup(model), model) : undefined),
+    [model, input.draft],
+  )
+  const problems = useMemo(
+    () => (model && draft ? setupProblems(draft, model) : []),
+    [model, draft],
+  )
+  const built = useMemo(
+    () => (model && draft ? setupBindings(draft, model) : undefined),
+    [model, draft],
+  )
+  const body =
+    built && preview
+      ? { preview_id: preview.id, preview_digest: preview.digest, ...built.bindings }
+      : undefined
+  const fingerprint = body ? JSON.stringify(body) : ''
+  const current = check?.fingerprint === fingerprint ? check.result : undefined
+  const ready = !!preview?.is_current && !unsaved
+  function change(next: RunSetupDraft) {
+    setCreatedId('')
+    onInputChange({ dirty: hasSetupInput(next), draft: next })
+  }
+  const preflight = useMutation({
+    mutationFn: async () => {
+      if (!body || !ready)
+        throw new Error('Save and freeze the exact preparation before checking a run.')
+      const checked = fingerprint
+      return {
+        fingerprint: checked,
+        result: await api.send<RunPreflight>(`${path}/preflight`, 'POST', body, version),
+      }
+    },
+    onSuccess: setCheck,
+  })
   const create = useMutation({
     mutationFn: () => {
-      if (!preview || !preview.is_current || unsaved)
+      if (!body || !ready)
         throw new Error('Save and freeze the exact preparation before creating a run.')
-      return api.send<Run>(
-        path,
-        'POST',
-        {
-          ...runOptions(options),
-          preview_id: preview.id,
-          preview_digest: preview.digest,
-          trigger,
-        },
-        version,
-      )
+      return api.send<Run>(path, 'POST', body, version)
     },
     onSuccess: (run) => {
-      setOptions(emptyBindings)
-      setTrigger('manual')
+      onInputChange(emptyRunSetup)
+      setCheck(undefined)
+      setImportNotes([])
       setCreatedId(run.id)
       void cache.invalidateQueries({ queryKey: [wid, 'board-runs', bid] })
     },
   })
-  useEffect(() => {
-    onInputChange?.({
-      dirty: !createdId && (options !== emptyBindings || trigger !== 'manual' || create.isPending),
-      options,
-      trigger,
-    })
-  }, [options, trigger, create.isPending, createdId, onInputChange])
-  useEffect(() => () => onInputChange?.(emptyRunSetup), [onInputChange])
+  const busy = preflight.isPending || create.isPending
+  const createReason = !operator
+    ? 'Explicit operator access is required.'
+    : !preview
+      ? 'Freeze a preview in the Preparation tab first.'
+      : !ready
+        ? 'Save the preparation and freeze a current preview first.'
+        : problems.length
+          ? 'Finish the items listed above.'
+          : !current
+            ? check
+              ? 'The setup changed after the last check. Check it again.'
+              : 'Check the setup first.'
+            : !current.valid
+              ? 'Fix the setup issues the check found.'
+              : ''
   return (
     <>
-      <section className="glass preparation-panel">
-        <h2>Exercise runs</h2>
+      <section className="glass preparation-panel" aria-labelledby="run-setup-heading">
+        <h2 id="run-setup-heading">Set up an exercise run</h2>
         <p>
-          Run a pinned preparation through the isolated SQL/REST executor. Production always
-          requires independent approval; other environments follow their administrator policy.
+          Choose what to watch, how each goal is judged, and how changes are undone. Game Theory
+          fills in the exact step and result references for you.
         </p>
-        <ErrorNotice error={runs.error ?? grants.error ?? me.error ?? create.error} />
+        <ErrorNotice error={runs.error ?? grants.error ?? me.error} />
         {createdId && (
-          <p className="notice" role="status">
-            Run frozen.{' '}
+          <p className="notice success" role="status">
+            Run created and pinned.{' '}
             <Link to={`/w/${wid}/runs/${createdId}`}>
-              Review its policy, readiness, and execution controls
+              Review its policy, readiness, and launch checklist
             </Link>
             .
           </p>
         )}
-        {!operator && grants.data && (
+        {!operator && grants.data && me.data && (
           <p className="notice">
-            An administrator must grant you explicit operator access before you can create a run.
-            Authoring and preparation approval do not grant execution rights.
+            An administrator must grant you explicit operator access before you can check or create
+            a run. Authoring and preparation approval don’t grant execution rights.
           </p>
         )}
-        {(!preview?.is_current || unsaved) && (
+        {!preview ? (
           <p className="notice">
-            Save the preparation and freeze a current preview before creating a run.
+            Freeze a preview in the Preparation tab first. Runs use a frozen, exact preparation.{' '}
+            <button type="button" className="link-button" onClick={onOpenPreparation}>
+              Open the Preparation tab
+            </button>
           </p>
+        ) : (
+          !ready && (
+            <p className="notice">
+              {unsaved
+                ? 'The preparation has unsaved or newer changes.'
+                : 'The selected preview is not the current saved version.'}{' '}
+              Save it and freeze a current preview before creating a run. Your run setup is kept.
+            </p>
+          )
         )}
-        <form
-          className="stack"
-          onSubmit={(event) => {
-            event.preventDefault()
-            create.mutate()
-          }}
-        >
-          <label>
-            Start mode
-            <select
-              value={trigger}
-              disabled={create.isPending}
-              onChange={(event) => {
-                setCreatedId('')
-                if (event.target.value === 'manual' || event.target.value === 'scheduled')
-                  setTrigger(event.target.value)
-              }}
-            >
-              <option value="manual">Manual, inside the pinned window</option>
-              <option value="scheduled">One-off, at the pinned window start</option>
-            </select>
-          </label>
-          <details>
-            <summary>Observation, objective, and recovery bindings</summary>
-            <p>
-              Optional, restricted JSON bindings are validated by the service before the run is
-              created. Use step and objective IDs from the pinned preview. No scripts or arbitrary
-              requests are accepted. Unbound objectives remain indeterminate; unbound write recovery
-              requires an external operator.
+        {model && draft && (
+          <RunSetupForm
+            model={model}
+            draft={draft}
+            problems={problems}
+            disabled={busy}
+            onChange={change}
+          />
+        )}
+        {model && built && preview && (
+          <details className="setup-section">
+            <summary>Settings file (advanced)</summary>
+            <p className="preparation-note">
+              Export these choices as the same JSON the service accepts, or import a file exported
+              earlier. Imported values fill the forms above; nothing is created until you check and
+              confirm.
             </p>
-            <label>
-              Run bindings JSON
-              <textarea
-                className="run-json-input"
-                value={options}
-                disabled={create.isPending}
-                onChange={(event) => {
-                  setCreatedId('')
-                  setOptions(event.target.value)
-                }}
-                spellCheck={false}
-              />
-            </label>
-            <p>
-              Each observation identifies a read step, field, comparison, interval, timeout, and
-              sample limit. Objective rules identify an objective, evidence step/field, comparison,
-              and optional authoritative timing anchor. Recovery bindings require recorded ownership
-              and version preconditions.
-            </p>
-            {preview && (
+            <div className="toolbar">
+              <button
+                type="button"
+                onClick={() => exportJson(built.bindings, `board-${bid}-run-settings.json`)}
+              >
+                Export settings file
+              </button>
               <button
                 type="button"
                 onClick={() => exportJson(preview.manifest, 'pinned-preparation.json')}
               >
                 Export pinned IDs and contracts
               </button>
+            </div>
+            <label>
+              Import settings file
+              <input
+                type="file"
+                accept=".json,application/json"
+                disabled={busy || !draft}
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ''
+                  setImportError(undefined)
+                  setImportNotes([])
+                  if (!file || !draft) return
+                  if (file.size > 256 * 1024) {
+                    setImportError(new Error('Choose a settings file no larger than 256 KiB.'))
+                    return
+                  }
+                  void file
+                    .text()
+                    .then((text) => {
+                      const imported = importSetup(runOptions(text), model, draft)
+                      change(imported.draft)
+                      setImportNotes(
+                        imported.problems.length
+                          ? imported.problems
+                          : ['Settings imported. Review each check before checking the setup.'],
+                      )
+                    })
+                    .catch(setImportError)
+                }}
+              />
+            </label>
+            <ErrorNotice error={importError} />
+            {importNotes.length > 0 && (
+              <ul className="preparation-note" role="status">
+                {importNotes.map((note) => (
+                  <li key={note}>{note}</li>
+                ))}
+              </ul>
             )}
           </details>
-          <p className="preparation-note">
-            Creating a run does not dispatch it. Review its exact manifest, readiness, and
-            environment policy next. SQL idempotency keys are dispatcher-owned; clear any
-            preparation literal for that field.
-          </p>
-          <button
-            className="primary"
-            disabled={!operator || !preview?.is_current || unsaved || create.isPending}
-          >
-            {create.isPending ? 'Freezing run...' : 'Create pinned run'}
-          </button>
-        </form>
+        )}
       </section>
+      {model && (
+        <section className="glass preparation-panel" aria-labelledby="run-check-heading">
+          <div className="section-heading">
+            <div>
+              <h2 id="run-check-heading">Check before creating</h2>
+              <p className="preparation-note">
+                The server tests this setup exactly as a real run would, then shows what’s ready and
+                what’s missing. Nothing is saved, sent, or authorized.
+              </p>
+            </div>
+            <button
+              type="button"
+              className={current ? undefined : 'primary'}
+              disabled={!operator || !ready || busy}
+              onClick={() => preflight.mutate()}
+            >
+              {preflight.isPending ? 'Checking…' : current ? 'Check again' : 'Check setup'}
+            </button>
+          </div>
+          <ErrorNotice error={serviceMessage(preflight.error)} />
+          {problems.length > 0 && (
+            <div className="notice" role="status">
+              <strong>
+                {problems.length === 1 ? '1 item needs' : `${problems.length} items need`} attention
+                before checking
+              </strong>
+              <ul className="setup-problem-list">
+                {problems.map((problem) => (
+                  <li key={`${problem.section}/${problem.key}/${problem.message}`}>
+                    <div>
+                      <p>{problem.message}</p>
+                      <button
+                        type="button"
+                        className="link-button"
+                        onClick={() =>
+                          problem.section === 'preparation'
+                            ? onOpenPreparation()
+                            : focusSetup(problem.section, problem.key)
+                        }
+                      >
+                        {problem.section === 'preparation'
+                          ? 'Open the Preparation tab'
+                          : 'Go to it'}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {check && !current && (
+            <p className="notice" role="status">
+              Your setup changed after the last check. Check it again before creating the run.
+            </p>
+          )}
+          {current && built && (
+            <PreflightResult
+              result={current}
+              model={model}
+              origins={built.origins}
+              admin={admin}
+              onOpenPreparation={onOpenPreparation}
+              onFocus={focusSetup}
+            />
+          )}
+          <div className="preparation-actions">
+            <button
+              type="button"
+              className="primary"
+              disabled={!!createReason || busy}
+              aria-describedby="run-create-reason"
+              onClick={() => create.mutate()}
+            >
+              {create.isPending ? 'Creating…' : 'Create pinned run'}
+            </button>
+            <span id="run-create-reason" className="preparation-note">
+              {createReason ||
+                'Creating a run pins these inputs. It does not authorize, start, or contact anything.'}
+            </span>
+          </div>
+          <ErrorNotice error={serviceMessage(create.error)} />
+          {create.error instanceof ApiError && create.error.status === 409 && (
+            <p className="notice">
+              The board or preview changed. Your run setup is kept; freeze a current preview and
+              check again.
+            </p>
+          )}
+        </section>
+      )}
       <section className="glass preparation-panel">
         <h2>Run history</h2>
         {runs.isPending && <p role="status">Loading runs...</p>}
@@ -358,6 +552,13 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
       </main>
     )
   const canAct = run.can_operate && !busy && !!note.trim()
+  const controlReason = !run.can_operate
+    ? 'Only the original operator, with an active grant, can authorize, start, or resume. Any explicit operator can stop.'
+    : !note.trim()
+      ? 'Enter an operator note to enable these actions.'
+      : run.blockers.length > 0 && ['prepared', 'paused', 'intervention'].includes(run.state)
+        ? 'Start and resume stay unavailable until the launch checklist has no blockers.'
+        : ''
   const canSafetyAct = run.can_stop && !busy && !!note.trim()
   const active = [
     'queued',
@@ -417,6 +618,11 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
       )}
       <div className="run-workspace">
         <section className="stack">
+          <LaunchChecklist
+            run={run}
+            admin={!!me.data?.organization_admin}
+            authorizeHere={run.can_operate}
+          />
           <section className="glass preparation-panel">
             <h2>Execution authority</h2>
             <strong>
@@ -484,16 +690,6 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
                   ))}
                 </ul>
               </details>
-            )}
-            {run.blockers.length > 0 && (
-              <div className="notice">
-                <strong>Current blockers</strong>
-                <ul>
-                  {run.blockers.map((reason) => (
-                    <li key={reason}>{reason}</li>
-                  ))}
-                </ul>
-              </div>
             )}
             <details>
               <summary>Pinned execution manifest</summary>
@@ -669,6 +865,11 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
                   </button>
                 )}
               </div>
+            )}
+            {run.can_stop && controlReason && (
+              <p className="preparation-note" role="status">
+                {controlReason}
+              </p>
             )}
             <p className="preparation-note">
               Pause and stop do not undo accepted effects. Unknown outcomes require reconciliation,
