@@ -368,6 +368,11 @@ run's request returns 404. The `flood-lab-milestones/v1` response comes from one
 consistent read: it takes the writers' run lock in shared mode, so no in-flight
 writer can later commit an earlier clock value, then reads `as_of` from
 `SYSUTCDATETIME()` and applies the parameterized `assessment.py` rules.
+The shared lock is held only for that one bounded read. A participant, API or
+SQL injector write can wait behind it for at most the existing 5-second run-lock
+timeout. If that expires, the write rolls back and fails explicitly as busy or
+`outcome_unknown`; retrying the identical inputs with the same idempotency key
+reconciles it, and no data is lost.
 
 - `created_event_id` is the succeeded `request.create` event. Seeded requests
   have none, so it and both verdicts stay null; no event is invented.
