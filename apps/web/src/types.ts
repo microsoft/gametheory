@@ -9,7 +9,13 @@ export type FlowEdge = Schemas['FlowEdge']
 export interface Config {
   cloud: string
   auth: { configured: boolean; client_id: string; authority: string; scope: string }
-  capabilities: { authoring: boolean; assets: boolean; planning: boolean; execution: boolean }
+  capabilities: {
+    authoring: boolean
+    assets: boolean
+    planning: boolean
+    execution: boolean
+    run_assistant: boolean
+  }
   max_upload_bytes: number
 }
 export interface Environment {

@@ -9,6 +9,8 @@ import { parseUniqueJson } from './strictJson'
 import { PreflightResult, type RunPreflight } from './RunPreflight'
 import { goalId, RunSetupForm, undoId, watchId } from './RunSetupForm'
 import { LaunchChecklist } from './RunLaunchChecklist'
+import { RunCheckAssistant } from './RunCheckAssistant'
+import type { SuggestionLink } from './runChecks'
 import {
   alignSetup,
   emptySetup,
@@ -23,7 +25,14 @@ import {
 type Schemas = components['schemas']
 type Run = Schemas['RunView']
 type Action = Schemas['RunControl']['action']
-export type RunSetupInput = { dirty: boolean; draft?: RunSetupDraft }
+export type RunSetupInput = {
+  dirty: boolean
+  draft?: RunSetupDraft
+  /** The reviewed suggestion these checks started from; recorded as run provenance only. */
+  suggestion?: SuggestionLink
+  /** An unsent run-check assistant request. */
+  prompt?: string
+}
 export const emptyRunSetup: RunSetupInput = { dirty: false }
 
 export function runOptions(text: string): Record<string, unknown> {
@@ -52,6 +61,13 @@ export function hasSetupInput(draft: RunSetupDraft) {
     draft.goals.some((goal) => goal.measured) ||
     draft.undo.some((undo) => undo.mode !== 'manual')
   )
+}
+
+function withDirty(input: Omit<RunSetupInput, 'dirty'>): RunSetupInput {
+  return {
+    ...input,
+    dirty: (!!input.draft && hasSetupInput(input.draft)) || !!input.prompt?.trim(),
+  }
 }
 
 export function serviceMessage(error: unknown): unknown {
@@ -100,7 +116,7 @@ export function BoardRuns({
   onInputChange: (input: RunSetupInput) => void
   onOpenPreparation: () => void
 }) {
-  const { api } = useSession()
+  const { api, config } = useSession()
   const cache = useQueryClient()
   const [createdId, setCreatedId] = useState('')
   const [importNotes, setImportNotes] = useState<string[]>([])
@@ -137,16 +153,30 @@ export function BoardRuns({
     () => (model && draft ? setupBindings(draft, model) : undefined),
     [model, draft],
   )
+  // A suggestion reviewed against another preview is never sent as provenance.
+  const linked =
+    input.suggestion && preview && input.suggestion.preview_id === preview.id
+      ? input.suggestion.id
+      : undefined
   const body =
     built && preview
-      ? { preview_id: preview.id, preview_digest: preview.digest, ...built.bindings }
+      ? {
+          preview_id: preview.id,
+          preview_digest: preview.digest,
+          ...built.bindings,
+          ...(linked ? { suggestion_id: linked } : {}),
+        }
       : undefined
   const fingerprint = body ? JSON.stringify(body) : ''
   const current = check?.fingerprint === fingerprint ? check.result : undefined
   const ready = !!preview?.is_current && !unsaved
-  function change(next: RunSetupDraft) {
+  /** Pass null to stop recording the suggestion, for example after importing a file. */
+  function change(
+    next: RunSetupDraft,
+    suggestion: SuggestionLink | null = input.suggestion ?? null,
+  ) {
     setCreatedId('')
-    onInputChange({ dirty: hasSetupInput(next), draft: next })
+    onInputChange(withDirty({ ...input, draft: next, suggestion: suggestion ?? undefined }))
   }
   const preflight = useMutation({
     mutationFn: async () => {
@@ -167,7 +197,7 @@ export function BoardRuns({
       return api.send<Run>(path, 'POST', body, version)
     },
     onSuccess: (run) => {
-      onInputChange(emptyRunSetup)
+      onInputChange(withDirty({ prompt: input.prompt }))
       setCheck(undefined)
       setImportNotes([])
       setCreatedId(run.id)
@@ -192,6 +222,23 @@ export function BoardRuns({
               : ''
   return (
     <>
+      {config.capabilities.run_assistant && operator && preview && model && draft && (
+        <RunCheckAssistant
+          wid={wid}
+          bid={bid}
+          preview={preview}
+          model={model}
+          draft={draft}
+          ready={ready}
+          disabled={busy}
+          prompt={input.prompt ?? ''}
+          onPromptChange={(prompt) => onInputChange(withDirty({ ...input, prompt }))}
+          onApply={(next, link) => {
+            setImportNotes([])
+            change(next, link)
+          }}
+        />
+      )}
       <section className="glass preparation-panel" aria-labelledby="run-setup-heading">
         <h2 id="run-setup-heading">Set up an exercise run</h2>
         <p>
@@ -230,6 +277,20 @@ export function BoardRuns({
               Save it and freeze a current preview before creating a run. Your run setup is kept.
             </p>
           )
+        )}
+        {linked && (
+          <p className="preparation-note" role="status">
+            These checks started from an assistant suggestion. Creating the run records which
+            suggestion you used; the checks are exactly what you see here.{' '}
+            <button
+              type="button"
+              className="link-button"
+              disabled={busy}
+              onClick={() => change(draft ?? emptySetup(model!), null)}
+            >
+              Don’t record the suggestion
+            </button>
+          </p>
         )}
         {model && draft && (
           <RunSetupForm
@@ -282,7 +343,7 @@ export function BoardRuns({
                     .text()
                     .then((text) => {
                       const imported = importSetup(runOptions(text), model, draft)
-                      change(imported.draft)
+                      change(imported.draft, null)
                       setImportNotes(
                         imported.problems.length
                           ? imported.problems

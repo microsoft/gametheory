@@ -269,12 +269,19 @@ export function AdminSettingsContent({ permissionError }: { permissionError?: un
                 <dd>
                   {runtime.data.target_bindings_configured ? 'Configured' : 'Missing configuration'}
                 </dd>
+                <dt>Run-check assistant</dt>
+                <dd>
+                  {runtime.data.run_assistant_enabled
+                    ? 'Enabled: operators can ask for suggested run checks'
+                    : 'Disabled (default)'}
+                </dd>
               </dl>
               <p className="notice">{runtime.data.message}</p>
               <p>
                 Only a deployment operator can configure the executor, target identities, and
                 readiness receipts. Settings never provisions resources, changes cloud permissions,
-                or sends messages.
+                or sends messages. The run-check assistant only suggests checks for operators to
+                review; it never creates, authorizes, or starts runs.
               </p>
             </>
           )}

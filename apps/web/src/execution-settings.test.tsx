@@ -26,7 +26,13 @@ const config: Config = {
     authority: 'https://fixture.invalid',
     scope: 'fixture',
   },
-  capabilities: { authoring: true, assets: false, planning: false, execution: true },
+  capabilities: {
+    authoring: true,
+    assets: false,
+    planning: false,
+    execution: true,
+    run_assistant: false,
+  },
   max_upload_bytes: 1024,
 }
 const policy: components['schemas']['EnvironmentPolicyView'] = {
