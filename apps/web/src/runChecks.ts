@@ -13,7 +13,10 @@ import {
 
 type Schemas = components['schemas']
 export type Suggestion = Schemas['RunCheckSuggestionView']
-export type SuggestionLink = { id: string; preview_id: string }
+/** Form entries a suggestion filled: watch keys, measured objective IDs, and automatic undo steps. */
+export type SuggestedEntries = { watches: string[]; objectives: string[]; undo: string[] }
+/** The suggestion some current checks came from, recorded with the run as provenance only. */
+export type SuggestionLink = SuggestedEntries & { id: string; preview_id: string }
 export type SuggestedCheck = {
   key: string
   section: 'watch' | 'goal' | 'undo'
@@ -43,11 +46,51 @@ export function usableCount(item: Suggestion) {
 
 /** Checks the operator would lose by replacing the forms; the trigger choice is always kept. */
 export function hasChecks(draft: RunSetupDraft) {
-  return (
-    draft.watches.length > 0 ||
-    draft.goals.some((goal) => goal.measured) ||
-    draft.undo.some((undo) => undo.mode === 'automatic')
+  return entryCount(formEntries(draft)) > 0
+}
+
+export function formEntries(draft: RunSetupDraft): SuggestedEntries {
+  return {
+    watches: draft.watches.map((watch) => watch.key),
+    objectives: draft.goals.filter((goal) => goal.measured).map((goal) => goal.objective_id),
+    undo: draft.undo.filter((undo) => undo.mode === 'automatic').map((undo) => undo.step_id),
+  }
+}
+
+export function entryCount(entries: SuggestedEntries) {
+  return entries.watches.length + entries.objectives.length + entries.undo.length
+}
+
+/**
+ * Keep a link only while at least one entry it filled is still in the forms. Entries count
+ * while being edited, even when briefly incomplete: incomplete checks block creation anyway.
+ */
+export function remainingLink(link: SuggestionLink | undefined, draft: RunSetupDraft) {
+  if (!link) return undefined
+  const present = formEntries(draft)
+  const remains = (['watches', 'objectives', 'undo'] as const).some((kind) =>
+    link[kind].some((entry) => present[kind].includes(entry)),
   )
+  return remains ? link : undefined
+}
+
+/** Link a suggestion that just filled entries, keeping what it filled earlier while linked. */
+export function linkSuggestion(
+  current: SuggestionLink | undefined,
+  item: Pick<Suggestion, 'id' | 'preview_id'>,
+  added: SuggestedEntries,
+): SuggestionLink {
+  const same = current?.id === item.id && current.preview_id === item.preview_id
+  const union = (kind: keyof SuggestedEntries) => [
+    ...new Set([...(same ? current[kind] : []), ...added[kind]]),
+  ]
+  return {
+    id: item.id,
+    preview_id: item.preview_id,
+    watches: union('watches'),
+    objectives: union('objectives'),
+    undo: union('undo'),
+  }
 }
 
 /** The valid items as a settings file, so they reach the forms through importSetup. */
@@ -64,24 +107,37 @@ export function suggestionSettings(item: Suggestion, trigger: Trigger): Record<s
 export function mergeSetup(
   current: RunSetupDraft,
   suggested: RunSetupDraft,
-): { draft: RunSetupDraft; skipped: number } {
+): { draft: RunSetupDraft; added: SuggestedEntries; skipped: number } {
   const watched = new Set(current.watches.map((watch) => watch.step_id))
   const candidates = suggested.watches.filter((watch) => !watched.has(watch.step_id))
   const room = Math.max(0, MAX_WATCHES - current.watches.length)
+  const watches = candidates.slice(0, room)
+  // Only a suggested rule replaces an entry, so unmeasured fields the operator typed are kept.
+  const goal = (objectiveId: string) =>
+    suggested.goals.find((item) => item.objective_id === objectiveId && item.measured)
+  const undo = (stepId: string) =>
+    suggested.undo.find((item) => item.step_id === stepId && item.mode === 'automatic')
+  const goals = current.goals.map((item) =>
+    item.measured ? item : (goal(item.objective_id) ?? item),
+  )
+  const undoPlan = current.undo.map((item) =>
+    item.mode === 'automatic' ? item : (undo(item.step_id) ?? item),
+  )
   return {
     draft: {
       trigger: current.trigger,
-      watches: [...current.watches, ...candidates.slice(0, room)],
-      goals: current.goals.map((goal) =>
-        goal.measured
-          ? goal
-          : (suggested.goals.find((item) => item.objective_id === goal.objective_id) ?? goal),
-      ),
-      undo: current.undo.map((undo) =>
-        undo.mode === 'automatic'
-          ? undo
-          : (suggested.undo.find((item) => item.step_id === undo.step_id) ?? undo),
-      ),
+      watches: [...current.watches, ...watches],
+      goals,
+      undo: undoPlan,
+    },
+    added: {
+      watches: watches.map((item) => item.key),
+      objectives: current.goals
+        .filter((item) => !item.measured && goal(item.objective_id))
+        .map((item) => item.objective_id),
+      undo: current.undo
+        .filter((item) => item.mode !== 'automatic' && undo(item.step_id))
+        .map((item) => item.step_id),
     },
     skipped: Math.max(0, candidates.length - room),
   }
@@ -92,16 +148,17 @@ export function applySuggestion(
   model: SetupModel,
   draft: RunSetupDraft,
   mode: 'replace' | 'merge',
-): { draft: RunSetupDraft; notes: string[] } {
+): { draft: RunSetupDraft; added: SuggestedEntries; notes: string[] } {
   const imported = importSetup(suggestionSettings(item, draft.trigger), model, draft)
-  if (mode === 'replace') return { draft: imported.draft, notes: imported.problems }
+  if (mode === 'replace')
+    return { draft: imported.draft, added: formEntries(imported.draft), notes: imported.problems }
   const merged = mergeSetup(draft, imported.draft)
   const notes = [...imported.problems]
   if (merged.skipped)
     notes.push(
       `${merged.skipped} suggested ${merged.skipped === 1 ? 'check was' : 'checks were'} not added because a run can have at most ${MAX_WATCHES} checks.`,
     )
-  return { draft: merged.draft, notes }
+  return { draft: merged.draft, added: merged.added, notes }
 }
 
 /** Read each suggested item back in the same plain language as the forms. */

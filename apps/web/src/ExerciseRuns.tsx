@@ -10,7 +10,7 @@ import { PreflightResult, type RunPreflight } from './RunPreflight'
 import { goalId, RunSetupForm, undoId, watchId } from './RunSetupForm'
 import { LaunchChecklist } from './RunLaunchChecklist'
 import { RunCheckAssistant } from './RunCheckAssistant'
-import type { SuggestionLink } from './runChecks'
+import { linkSuggestion, remainingLink, type SuggestionLink } from './runChecks'
 import {
   alignSetup,
   emptySetup,
@@ -153,10 +153,10 @@ export function BoardRuns({
     () => (model && draft ? setupBindings(draft, model) : undefined),
     [model, draft],
   )
-  // A suggestion reviewed against another preview is never sent as provenance.
+  // Provenance names a suggestion only for this preview and while an entry it filled remains.
   const linked =
-    input.suggestion && preview && input.suggestion.preview_id === preview.id
-      ? input.suggestion.id
+    draft && preview && input.suggestion?.preview_id === preview.id
+      ? remainingLink(input.suggestion, draft)?.id
       : undefined
   const body =
     built && preview
@@ -170,13 +170,22 @@ export function BoardRuns({
   const fingerprint = body ? JSON.stringify(body) : ''
   const current = check?.fingerprint === fingerprint ? check.result : undefined
   const ready = !!preview?.is_current && !unsaved
-  /** Pass null to stop recording the suggestion, for example after importing a file. */
+  /**
+   * Pass null to stop recording the suggestion, for example after importing a file. A link is
+   * dropped once the operator removes every entry it filled, and never comes back on its own.
+   */
   function change(
     next: RunSetupDraft,
     suggestion: SuggestionLink | null = input.suggestion ?? null,
   ) {
     setCreatedId('')
-    onInputChange(withDirty({ ...input, draft: next, suggestion: suggestion ?? undefined }))
+    onInputChange(
+      withDirty({
+        ...input,
+        draft: next,
+        suggestion: remainingLink(suggestion ?? undefined, next),
+      }),
+    )
   }
   const preflight = useMutation({
     mutationFn: async () => {
@@ -233,9 +242,9 @@ export function BoardRuns({
           disabled={busy}
           prompt={input.prompt ?? ''}
           onPromptChange={(prompt) => onInputChange(withDirty({ ...input, prompt }))}
-          onApply={(next, link) => {
+          onApply={(next, item, added) => {
             setImportNotes([])
-            change(next, link)
+            change(next, linkSuggestion(input.suggestion, item, added))
           }}
         />
       )}

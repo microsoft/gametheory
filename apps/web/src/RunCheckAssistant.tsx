@@ -10,16 +10,20 @@ import {
   applySuggestion,
   currentFor,
   describeSuggestion,
+  entryCount,
   EVERY_GOAL_PROMPT,
   hasChecks,
   usableCount,
   type SuggestedCheck,
+  type SuggestedEntries,
   type Suggestion,
-  type SuggestionLink,
 } from './runChecks'
 
 type Accepted = components['schemas']['RunCheckRequestAccepted']
 type Mode = 'replace' | 'merge'
+const ADDED_NOTE =
+  'Added to the forms below. Review each one, then check the setup before creating.'
+const NOTHING_NEW_NOTE = 'Nothing new to add. Your forms are unchanged.'
 
 const statusLabel: Record<Suggestion['status'], string> = {
   queued: 'Waiting to start',
@@ -58,7 +62,8 @@ export function RunCheckAssistant({
   disabled: boolean
   prompt: string
   onPromptChange: (prompt: string) => void
-  onApply: (draft: RunSetupDraft, link: SuggestionLink) => void
+  /** Called only when a suggestion filled at least one entry, which `added` lists. */
+  onApply: (draft: RunSetupDraft, item: Suggestion, added: SuggestedEntries) => void
 }) {
   const { api } = useSession()
   const cache = useQueryClient()
@@ -109,6 +114,12 @@ export function RunCheckAssistant({
     if (text.trim() && !blocked) ask.mutate(text)
   }
   function use(item: Suggestion, mode: Mode) {
+    const result = applySuggestion(item, model, draft, mode)
+    // Filling nothing changes nothing: the forms and any recorded suggestion stay as they are.
+    if (!entryCount(result.added)) {
+      setApplied({ id: item.id, notes: [NOTHING_NEW_NOTE, ...result.notes] })
+      return
+    }
     if (
       mode === 'replace' &&
       hasChecks(draft) &&
@@ -117,14 +128,8 @@ export function RunCheckAssistant({
       )
     )
       return
-    const result = applySuggestion(item, model, draft, mode)
-    onApply(result.draft, { id: item.id, preview_id: item.preview_id })
-    setApplied({
-      id: item.id,
-      notes: result.notes.length
-        ? result.notes
-        : ['Added to the forms below. Review each one, then check the setup before creating.'],
-    })
+    onApply(result.draft, item, result.added)
+    setApplied({ id: item.id, notes: result.notes.length ? result.notes : [ADDED_NOTE] })
   }
 
   const turn = (item: Suggestion, live = false) => (

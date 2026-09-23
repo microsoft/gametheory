@@ -11,7 +11,9 @@ import {
   describeSuggestion,
   EVERY_GOAL_PROMPT,
   hasChecks,
+  linkSuggestion,
   mergeSetup,
+  remainingLink,
   suggestionSettings,
   type Suggestion,
 } from './runChecks'
@@ -130,14 +132,79 @@ describe('mapping reviewed suggestions into the guided forms', () => {
         : goal,
     )
     const suggested = importSetup(suggestionSettings(suggestion(), 'manual'), model, current).draft
-    const { draft, skipped } = mergeSetup(current, suggested)
+    const { draft, added, skipped } = mergeSetup(current, suggested)
     expect(skipped).toBe(0)
     expect(draft.watches).toEqual([mine])
     expect(draft.goals.find((goal) => goal.objective_id === ids.breach)).toEqual(current.goals[0])
     expect(draft.goals.find((goal) => goal.objective_id === ids.acknowledged)?.measured).toBe(true)
     expect(draft.undo.find((undo) => undo.step_id === ids.openTicket)?.mode).toBe('automatic')
+    expect(added).toEqual({ watches: [], objectives: [ids.acknowledged], undo: [ids.openTicket] })
     expect(hasChecks(emptySetup(model))).toBe(false)
     expect(hasChecks(draft)).toBe(true)
+  })
+
+  it('adds nothing, and says so, when the forms already cover every suggested item', () => {
+    const applied = applySuggestion(suggestion(), model, emptySetup(model), 'replace')
+    expect(applied.added).toEqual({
+      watches: [applied.draft.watches[0].key],
+      objectives: [ids.breach, ids.acknowledged],
+      undo: [ids.openTicket],
+    })
+    const again = applySuggestion(suggestion(), model, applied.draft, 'merge')
+    expect(again.added).toEqual({ watches: [], objectives: [], undo: [] })
+    expect(again.draft).toEqual(applied.draft)
+  })
+
+  it('keeps what the operator typed on a goal the suggestion does not cover', () => {
+    const current = emptySetup(model)
+    current.goals = current.goals.map((goal) =>
+      goal.objective_id === ids.breach ? { ...goal, step_id: ids.readOccupancy } : goal,
+    )
+    const partial = suggestion({ objectives: [valid(bindings.objectives[1])] })
+    const { draft, added } = applySuggestion(partial, model, current, 'merge')
+    expect(draft.goals.find((goal) => goal.objective_id === ids.breach)).toEqual(current.goals[0])
+    expect(added.objectives).toEqual([ids.acknowledged])
+  })
+
+  it('keeps a link while any entry it filled remains, even mid-edit, and drops it after', () => {
+    const { draft, added } = applySuggestion(suggestion(), model, emptySetup(model), 'replace')
+    const link = linkSuggestion(undefined, suggestion(), added)
+    const edited = {
+      ...draft,
+      watches: draft.watches.map((watch) => ({ ...watch, value: undefined })),
+      goals: draft.goals.map((goal) => ({ ...goal, measured: false })),
+    }
+    expect(remainingLink(link, edited)).toBe(link)
+    const cleared = {
+      ...edited,
+      watches: [],
+      undo: edited.undo.map((undo) => ({ ...undo, mode: 'manual' as const })),
+    }
+    expect(remainingLink(link, cleared)).toBeUndefined()
+    const mine = { ...cleared, watches: [newWatch(model, cleared)] }
+    expect(remainingLink(link, mine)).toBeUndefined()
+    expect(remainingLink(undefined, draft)).toBeUndefined()
+  })
+
+  it('adds to what a suggestion filled earlier, and a different suggestion replaces it', () => {
+    const first = linkSuggestion(undefined, suggestion(), {
+      watches: ['watch-a'],
+      objectives: [ids.breach],
+      undo: [],
+    })
+    const more = { watches: ['watch-b'], objectives: [ids.breach], undo: [ids.openTicket] }
+    expect(linkSuggestion(first, suggestion(), more)).toEqual({
+      id: 'suggestion-1',
+      preview_id: 'golden-preview',
+      watches: ['watch-a', 'watch-b'],
+      objectives: [ids.breach],
+      undo: [ids.openTicket],
+    })
+    expect(linkSuggestion(first, suggestion({ id: 'suggestion-2' }), more)).toEqual({
+      id: 'suggestion-2',
+      preview_id: 'golden-preview',
+      ...more,
+    })
   })
 
   it('reads each suggestion back in the same plain language as the forms', () => {
@@ -278,6 +345,97 @@ describe('describe what to check', () => {
       ...golden.run_create,
       suggestion_id: 'suggestion-1',
     })
+  })
+
+  it('stops recording a suggestion once every item it filled is removed', async () => {
+    const fetch = fixture(() => json([suggestion()]))
+    mount()
+    fireEvent.click(await screen.findByRole('button', { name: 'Use these suggestions' }))
+    const linked = /These checks started from an assistant suggestion/
+    expect(screen.getByText(linked)).toBeVisible()
+    // Editing a suggested check keeps the link, even while its value is briefly empty.
+    const value = screen.getByLabelText('Compare with · occupancy_percent')
+    fireEvent.change(value, { target: { value: '' } })
+    expect(screen.getByText(linked)).toBeVisible()
+    fireEvent.change(value, { target: { value: '90' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Remove check 1' }))
+    for (const name of ['Breach identified quickly', 'Ticket acknowledged'])
+      fireEvent.click(
+        within(screen.getByRole('group', { name })).getByLabelText(
+          'Measure this goal from run evidence',
+        ),
+      )
+    expect(screen.getByText(linked)).toBeVisible()
+    fireEvent.click(
+      within(screen.getByRole('group', { name: 'Open resource ticket' })).getByLabelText(
+        'An operator handles it manually',
+      ),
+    )
+    expect(screen.queryByText(linked)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check setup' }))
+    await screen.findByText(/Ready to create/)
+    const create = screen.getByRole('button', { name: 'Create pinned run' })
+    await waitFor(() => expect(create).toBeEnabled())
+    fireEvent.click(create)
+    await screen.findByText(/Run created and pinned/)
+    const [checked] = bodies(fetch, '/runs/preflight')
+    const [created] = bodies(fetch, '/runs')
+    expect(created).toEqual(checked)
+    expect(created).toEqual({
+      preview_id: 'golden-preview',
+      preview_digest: 'e'.repeat(64),
+      trigger: 'manual',
+      observations: [],
+      objectives: [],
+      recovery: [],
+    })
+  })
+
+  it('does not link a suggestion again when adding it would change nothing', async () => {
+    const fetch = fixture(() => json([suggestion()]))
+    mount()
+    fireEvent.click(await screen.findByRole('button', { name: 'Use these suggestions' }))
+    const linked = /These checks started from an assistant suggestion/
+    fireEvent.click(screen.getByRole('button', { name: 'Don’t record the suggestion' }))
+    expect(screen.queryByText(linked)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Add to my checks' }))
+    expect(screen.getByText('Nothing new to add. Your forms are unchanged.')).toBeVisible()
+    expect(screen.queryByText(/Added to the forms below/)).toBeNull()
+    expect(screen.queryByText(linked)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check setup' }))
+    await screen.findByText(/Ready to create/)
+    const create = screen.getByRole('button', { name: 'Create pinned run' })
+    await waitFor(() => expect(create).toBeEnabled())
+    fireEvent.click(create)
+    await screen.findByText(/Run created and pinned/)
+    const [created] = bodies(fetch, '/runs')
+    expect(created).toEqual({
+      preview_id: 'golden-preview',
+      preview_digest: 'e'.repeat(64),
+      ...golden.run_create,
+    })
+  })
+
+  it('keeps the linked suggestion when another one adds nothing new', async () => {
+    const earlier = suggestion({ id: 'suggestion-0', prompt: 'Watch occupancy.' })
+    const fetch = fixture(() => json([suggestion(), earlier]))
+    mount()
+    const [latest] = await screen.findAllByRole('button', { name: 'Use these suggestions' })
+    fireEvent.click(latest)
+    fireEvent.click(screen.getByText('Earlier requests (1)'))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add to my checks' })[1])
+    expect(screen.getByText('Nothing new to add. Your forms are unchanged.')).toBeVisible()
+    expect(screen.getByText(/These checks started from an assistant suggestion/)).toBeVisible()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check setup' }))
+    await screen.findByText(/Ready to create/)
+    const create = screen.getByRole('button', { name: 'Create pinned run' })
+    await waitFor(() => expect(create).toBeEnabled())
+    fireEvent.click(create)
+    await screen.findByText(/Run created and pinned/)
+    expect(bodies(fetch, '/runs')[0].suggestion_id).toBe('suggestion-1')
   })
 
   it('asks before replacing checks the operator already set', async () => {

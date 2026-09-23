@@ -214,7 +214,12 @@ worker rechecks workspace membership before and after the model call and publish
 once with a conditional update. A lost Scheduler history closes the request instead
 of blocking the board, since suggestions have no external effects.
 
-Using a suggestion records provenance only. `RunCreate.suggestion_id` (also accepted
+Using a suggestion records provenance only. The forms link a suggestion only when
+applying it filled at least one watch, goal rule, or undo binding; when it would add
+nothing new, the forms and any existing link are left unchanged. Edited suggested
+items stay linked, but once the operator removes every item a suggestion filled (or
+chooses **Don't record the suggestion**, or imports a settings file), the link is
+dropped and does not come back on its own. `RunCreate.suggestion_id` (also accepted
 by preflight) must name a proposed suggestion for the same board and preview. It is
 recorded in the `run.prepared` event detail and a `run_setup.suggestion_used` audit
 record that shares the creation's correlation ID. It never enters the
