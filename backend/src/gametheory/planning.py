@@ -17,6 +17,8 @@ Uploaded file contents and external systems have not been read: asset IDs are re
 only. Ask the owner for relevant text rather than inventing facts about those sources.
 Preserve stable object identifiers and existing asset/connection/environment references.
 Do not invent existing asset, connection, or environment identifiers.
+Write each objective criterion so it can be measured: say what is observed, the
+threshold that counts as met, the deadline, and which recorded time starts the clock.
 Return a JSON object with summary and content fields matching the supplied schema.
 The content field is the complete proposed scenario, not a patch. No Markdown fences.
 Your result is only a proposal and requires explicit owner/editor review."""
