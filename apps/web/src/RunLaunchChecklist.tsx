@@ -56,9 +56,11 @@ export function LaunchChecklist({
   ]
   return (
     <section className="glass preparation-panel" aria-labelledby="launch-checklist-heading">
-      <h2 id="launch-checklist-heading">Launch checklist</h2>
+      <h2 id="launch-checklist-heading">
+        {run.state === 'prepared' ? 'Launch checklist' : 'Run checklist'}
+      </h2>
       <p className="preparation-note">
-        What this run will touch and what still stands in the way. Every action rechecks these
+        What this run touches and what still stands in the way. Every action rechecks these
         conditions when it happens.
       </p>
       {blockers.length ? (
@@ -95,60 +97,64 @@ export function LaunchChecklist({
           Up to {planned.toLocaleString()} of {limit.toLocaleString()}
         </dd>
       </dl>
-      <h3>Environments</h3>
-      <ul className="checklist">
-        {run.authorization
-          ? run.authorization.policies.map((policy) => (
-              <ReadyItem key={policy.environment_id}>
-                <strong>
-                  {policy.name} · {policy.classification} · policy version {policy.version}
-                </strong>
-                <p>
-                  Pinned when the run was authorized.{' '}
-                  {policy.approval_required
-                    ? 'Independent approval is required.'
-                    : 'Approval is not required.'}
-                </p>
-              </ReadyItem>
-            ))
-          : environments.map((item) => (
-              <AttentionItem key={item.environment_id}>
-                <strong>
-                  {item.environment_name} · labeled {item.content.classification}
-                </strong>
-                <p>Authorize the run to pin the environment’s current policy.</p>
-              </AttentionItem>
-            ))}
-      </ul>
-      <h3>Targets and readiness</h3>
-      <ul className="checklist">
-        {configurations.map((configuration) => {
-          const authority = run.authorization?.targets.find(
-            (item) => item.configuration_id === configuration.id,
-          )
-          const readiness = run.authorization?.readiness.find(
-            (item) => item.configuration_id === configuration.id,
-          )
-          const coverage = readinessCoverage(readiness, window?.ends_at)
-          const Item = authority && coverage.covers ? ReadyItem : AttentionItem
-          return (
-            <Item key={configuration.id}>
-              <strong>
-                {configuration.connection_name} · {configuration.connection_kind.toUpperCase()} ·{' '}
-                {configuration.environment_name}
-              </strong>
-              {authority ? (
-                <>
-                  <TargetIdentity authority={authority} />
-                  <p>{coverage.text}</p>
-                </>
-              ) : (
-                <p>Identity and readiness are pinned when the run is authorized.</p>
-              )}
-            </Item>
-          )
-        })}
-      </ul>
+      {configurations.length > 0 && (
+        <>
+          <h3>Environments</h3>
+          <ul className="checklist">
+            {run.authorization
+              ? run.authorization.policies.map((policy) => (
+                  <ReadyItem key={policy.environment_id}>
+                    <strong>
+                      {policy.name} · {policy.classification} · policy version {policy.version}
+                    </strong>
+                    <p>
+                      Pinned when the run was authorized.{' '}
+                      {policy.approval_required
+                        ? 'Independent approval is required.'
+                        : 'Approval is not required.'}
+                    </p>
+                  </ReadyItem>
+                ))
+              : environments.map((item) => (
+                  <AttentionItem key={item.environment_id}>
+                    <strong>
+                      {item.environment_name} · labeled {item.content.classification}
+                    </strong>
+                    <p>Authorize the run to pin the environment’s current policy.</p>
+                  </AttentionItem>
+                ))}
+          </ul>
+          <h3>Targets and readiness</h3>
+          <ul className="checklist">
+            {configurations.map((configuration) => {
+              const authority = run.authorization?.targets.find(
+                (item) => item.configuration_id === configuration.id,
+              )
+              const readiness = run.authorization?.readiness.find(
+                (item) => item.configuration_id === configuration.id,
+              )
+              const coverage = readinessCoverage(readiness, window?.ends_at)
+              const Item = authority && coverage.covers ? ReadyItem : AttentionItem
+              return (
+                <Item key={configuration.id}>
+                  <strong>
+                    {configuration.connection_name} · {configuration.connection_kind.toUpperCase()}{' '}
+                    · {configuration.environment_name}
+                  </strong>
+                  {authority ? (
+                    <>
+                      <TargetIdentity authority={authority} />
+                      <p>{coverage.text}</p>
+                    </>
+                  ) : (
+                    <p>Identity and readiness are pinned when the run is authorized.</p>
+                  )}
+                </Item>
+              )
+            })}
+          </ul>
+        </>
+      )}
       <h3>Undo plan</h3>
       {writes.length ? (
         <ul className="checklist">

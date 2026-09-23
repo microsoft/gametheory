@@ -186,7 +186,10 @@ test('run view keeps an uncertain effect distinct from success', async ({ page }
   await page.setViewportSize({ width: 1360, height: 1000 })
   await page.goto(`/w/${workspace}/runs/fixture-run`)
   await expect(page.getByText('stopped incomplete', { exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Launch checklist' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Run checklist' })).toBeVisible()
+  await expect(
+    page.getByText('Enter an operator note in Operator controls to record this report.'),
+  ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Start run', exact: true })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'External outcome report' })).toBeVisible()
   await page.screenshot({ path: info.outputPath('run-intervention.png'), fullPage: true })

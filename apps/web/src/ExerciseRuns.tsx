@@ -866,7 +866,7 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
                 )}
               </div>
             )}
-            {run.can_stop && controlReason && (
+            {run.can_stop && (active || run.state === 'prepared') && controlReason && (
               <p className="preparation-note" role="status">
                 {controlReason}
               </p>
@@ -1008,6 +1008,11 @@ export function ExerciseRunContent({ wid, rid }: { wid: string; rid: string }) {
                 <button disabled={!canSafetyAct || !manualStep || !evidence.trim()}>
                   Record external report
                 </button>
+                {!note.trim() && (
+                  <p className="preparation-note">
+                    Enter an operator note in Operator controls to record this report.
+                  </p>
+                )}
               </form>
             </section>
           )}
