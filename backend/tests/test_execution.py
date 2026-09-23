@@ -2,7 +2,7 @@ import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, Mock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -438,6 +438,160 @@ def test_observation_deadline_is_inclusive_and_late_observation_is_not_failure(o
         findings(manifest, [event(sid, 86, anchor + timedelta(seconds=offset))])[0].state
         == "indeterminate"
     )
+
+
+def milestone_manifest():
+    """Generic timing results; the engine has no knowledge of any exercise's semantics."""
+    from gametheory.preparation import OperationField
+
+    manifest = example_manifest()
+    config = manifest.preparation.configurations[0]
+    config.content.catalog.operations[0].results += [
+        OperationField(name="created_at", type="datetime"),
+        OperationField(name="acknowledged", type="boolean"),
+        OperationField(name="acknowledged_at", type="datetime", required=False),
+        OperationField(name="acknowledged_on_time", type="boolean", required=False),
+    ]
+    config.digest = canonical_digest(config.content.model_dump(mode="json"))
+    return RunManifest.model_validate(manifest.model_dump())
+
+
+def sample(step, at, kind="observation", **values):
+    return RunEvent(
+        id=str(uuid4()),
+        run_id=str(uuid4()),
+        kind=kind,
+        step_id=str(step),
+        created_at=at.replace(tzinfo=None),
+        detail=json.dumps({"phase": "exercise", "result": json.dumps({"quantity": 1, **values})}),
+    )
+
+
+def rule(manifest, **changes):
+    sid = manifest.preparation.draft.steps[0].id
+    return ObjectiveRule(
+        objective_id=manifest.preparation.scenario.content.objectives[0].id,
+        step_id=sid,
+        **changes,
+    )
+
+
+def test_empty_optional_verdict_stays_indeterminate_until_a_sample_decides_it():
+    manifest = milestone_manifest()
+    sid = manifest.preparation.draft.steps[0].id
+    manifest.objectives = [rule(manifest, field="acknowledged_on_time", operator="eq", value=True)]
+    current = datetime.now(UTC)
+    empty = [
+        sample(sid, current + timedelta(seconds=index), acknowledged_on_time=None)
+        for index in range(3)
+    ]
+    finding = findings(manifest, empty)[0]
+    assert finding.state == "indeterminate"
+    assert finding.reason == "A declared optional evidence field is missing."
+    assert finding.evidence_ids == []
+    for decided, expected in ((True, "met"), (False, "unmet")):
+        later = sample(sid, current + timedelta(seconds=9), acknowledged_on_time=decided)
+        finding = findings(manifest, [*empty, later])[0]
+        assert finding.state == expected
+        assert finding.evidence_ids == [UUID(later.id)]
+
+
+@pytest.mark.parametrize("offset,expected", [(300, "met"), (601, "unmet"), (None, "indeterminate")])
+def test_duplicate_samples_of_one_source_event_do_not_change_the_finding(offset, expected):
+    manifest = milestone_manifest()
+    sid = manifest.preparation.draft.steps[0].id
+    manifest.objectives = [
+        rule(
+            manifest,
+            field="acknowledged",
+            operator="eq",
+            value=True,
+            anchor_step_id=sid,
+            anchor_field="created_at",
+            within_seconds=600,
+            source_time_field="acknowledged_at",
+        )
+    ]
+    created = datetime.now(UTC) - timedelta(hours=1)
+    values = {
+        "created_at": created.isoformat(),
+        "acknowledged": offset is not None,
+        "acknowledged_at": (created + timedelta(seconds=offset)).isoformat() if offset else None,
+    }
+    observed = created + timedelta(seconds=900)
+    single = findings(manifest, [sample(sid, observed, **values)])[0]
+    # An observed read records the same result as operation evidence and as an observation.
+    repeated = [
+        sample(sid, observed, kind="operation.succeeded", **values),
+        sample(sid, observed + timedelta(microseconds=5), **values),
+        sample(sid, observed + timedelta(seconds=10), **values),
+    ]
+    finding = findings(manifest, repeated)[0]
+    assert single.state == finding.state == expected
+    assert len(finding.evidence_ids) == len(set(finding.evidence_ids))
+
+
+def test_late_observation_of_an_on_time_authoritative_source_is_met():
+    manifest = milestone_manifest()
+    sid = manifest.preparation.draft.steps[0].id
+    created = datetime.now(UTC) - timedelta(hours=1)
+    values = {
+        "created_at": created.isoformat(),
+        "acknowledged": True,
+        "acknowledged_at": (created + timedelta(seconds=600)).isoformat(),
+    }
+    late = sample(sid, created + timedelta(hours=1) - timedelta(seconds=1), **values)
+    clock = {
+        "field": "acknowledged",
+        "operator": "eq",
+        "value": True,
+        "anchor_step_id": sid,
+        "anchor_field": "created_at",
+        "within_seconds": 600,
+    }
+    manifest.objectives = [rule(manifest, **clock, source_time_field="acknowledged_at")]
+    assert findings(manifest, [late])[0].state == "met"
+    manifest.objectives = [rule(manifest, **clock)]
+    assert findings(manifest, [late])[0].state == "indeterminate"
+    early_source = values | {"acknowledged_at": (created - timedelta(seconds=1)).isoformat()}
+    manifest.objectives = [rule(manifest, **clock, source_time_field="acknowledged_at")]
+    assert findings(manifest, [sample(sid, late.created_at, **early_source)])[0].state == (
+        "indeterminate"
+    )
+
+
+def test_missing_anchor_evidence_is_indeterminate_not_failure():
+    manifest = milestone_manifest()
+    sid = manifest.preparation.draft.steps[0].id
+    anchor = uuid4()
+    manifest.preparation.draft.steps.append(
+        PreparationStep(
+            id=anchor,
+            label="Anchor read",
+            kind="operation",
+            binding=manifest.preparation.draft.steps[0].binding,
+            parameters={"record_id": str(uuid4())},
+        )
+    )
+    manifest = RunManifest.model_validate(manifest.model_dump())
+    manifest.objectives = [
+        rule(
+            manifest,
+            field="acknowledged",
+            operator="eq",
+            value=True,
+            anchor_step_id=anchor,
+            anchor_field="created_at",
+            within_seconds=600,
+            source_time_field="acknowledged_at",
+        )
+    ]
+    current = datetime.now(UTC)
+    observed = sample(sid, current, acknowledged=True, acknowledged_at=current.isoformat())
+    for anchor_samples in ([], [sample(anchor, current, created_at=None)]):
+        finding = findings(manifest, [observed, *anchor_samples])[0]
+        assert finding.state == "indeterminate"
+        assert finding.reason == "The authoritative start timestamp is missing."
 
 
 def test_readiness_receipts_require_all_checks_and_explicit_lifetime():
