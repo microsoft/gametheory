@@ -36,8 +36,8 @@
       "path": "objectives-and-evidence.md",
       "version": "1.2.0",
       "media_type": "text/markdown",
-      "size_bytes": 2314,
-      "sha256": "1c8e173ce3d2a2d7510573c9526614ab45ef33a2f902e731dab9293de774f343"
+      "size_bytes": 3702,
+      "sha256": "7a0190025136185e2d293bd422155824dfb5f98834bb685c27452ab0623e6b98"
     },
     {
       "path": "operation-catalog-graph.json",
@@ -64,8 +64,8 @@
       "path": "operator-and-ui-setup.md",
       "version": "1.2.0",
       "media_type": "text/markdown",
-      "size_bytes": 7042,
-      "sha256": "c9c710dea9aed02c3f66a5fc16f10cf903d8662043bec2c9ec401eed6ba74310"
+      "size_bytes": 9611,
+      "sha256": "16587a47d8f63844d1912637ed82eb37b066a21b6c34117514838b81f7a9bae7"
     },
     {
       "path": "personnel.json",

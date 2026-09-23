@@ -13,6 +13,18 @@ new executable-v2 path, not for historical preparation records. The descriptions
 below record the original pilot context; [execution.md](execution.md) is the
 current implemented contract and its limitations.
 
+Roadmap N3, closing the timed-response evidence gap, is implemented and awaits
+review. The lab adds the versioned `resource-request.milestones@1` read, which
+returns authoritative acknowledgement and allocation timing from its durable
+events and database clock. The unchanged v2 executor assesses the three
+demonstration objectives as met, unmet, or indeterminate without inferring
+timing from current status or treating absence as participant failure. Its
+real-SQL and cross-package tests execute in the `flood-lab` and `execution` CI
+jobs; see
+[execution.md](execution.md#authoritative-milestone-evidence) and the
+[lab README](../exercises/flood-response/README.md#authoritative-milestone-read).
+A paged event-history adapter remains future item F4.
+
 Graph sending, actual Azure deployment, approved target identities/resources,
 and the email-inclusive end-to-end exercise remain outstanding. The lab's
 operational UI and code-built assets remain external to Game Theory. No starter
