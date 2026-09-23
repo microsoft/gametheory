@@ -100,6 +100,12 @@ const ordered = new Set(['integer', 'number', 'datetime'])
 export const DEFAULT_INTERVAL_SECONDS = 10
 export const DEFAULT_TIMEOUT_SECONDS = 600
 export const DEFAULT_MAX_SAMPLES = 60
+/** Observation defaults the service applies when a settings file omits a bound. */
+export const SERVICE_OBSERVATION_DEFAULTS = {
+  interval_seconds: 10,
+  timeout_seconds: 600,
+  max_samples: 100,
+} as const
 export const MAX_ATTEMPTS = 1000
 
 export function supportsOrdering(field: OperationField | undefined) {
@@ -614,9 +620,11 @@ export function importSetup(
       field: text(entry.field),
       operator,
       value: entry.value,
-      interval_seconds: optionalInteger(entry.interval_seconds) ?? DEFAULT_INTERVAL_SECONDS,
-      timeout_seconds: optionalInteger(entry.timeout_seconds) ?? DEFAULT_TIMEOUT_SECONDS,
-      max_samples: optionalInteger(entry.max_samples) ?? DEFAULT_MAX_SAMPLES,
+      interval_seconds:
+        optionalInteger(entry.interval_seconds) ?? SERVICE_OBSERVATION_DEFAULTS.interval_seconds,
+      timeout_seconds:
+        optionalInteger(entry.timeout_seconds) ?? SERVICE_OBSERVATION_DEFAULTS.timeout_seconds,
+      max_samples: optionalInteger(entry.max_samples) ?? SERVICE_OBSERVATION_DEFAULTS.max_samples,
     })
   }
   const goals = base.goals.map((goal) => newGoal(goal.objective_id))
@@ -667,11 +675,20 @@ export function importSetup(
       continue
     }
     const parameters: Record<string, ValueInput> = {}
+    const editable = new Set(
+      (option.operation.parameters ?? [])
+        .filter((field) => !isDispatcherOwned(option.operation, field))
+        .map((field) => field.name),
+    )
     const raw = entry.parameters
     if (typeof raw === 'object' && raw !== null)
       for (const [name, item] of Object.entries(raw)) {
         const input = valueInput(item)
-        if (input) parameters[name] = input
+        if (!editable.has(name))
+          problems.push(
+            `Recovery input ${name} is not an editable input of “${option.operation.label}” and was skipped.`,
+          )
+        else if (input) parameters[name] = input
         else problems.push(`Recovery input ${name} was not a value or recorded result.`)
       }
     undo[index] = {
@@ -683,6 +700,7 @@ export function importSetup(
       version_parameter: text(entry.version_parameter),
     }
   }
-  const trigger = value.trigger === 'scheduled' ? 'scheduled' : base.trigger
+  // A settings file is complete: an omitted trigger means the service default, manual.
+  const trigger: Trigger = value.trigger === 'scheduled' ? 'scheduled' : 'manual'
   return { draft: { trigger, watches, goals, undo }, problems }
 }

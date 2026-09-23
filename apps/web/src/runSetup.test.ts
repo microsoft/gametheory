@@ -190,6 +190,32 @@ describe('guided run setup model', () => {
     expect(setupBindings(imported.draft, model).bindings).toEqual(exported)
   })
 
+  it('applies the file trigger and service defaults, and skips hidden recovery inputs', () => {
+    const model = setupModel(preview())
+    const exported = setupBindings(operatorChoices(model), model).bindings
+    const scheduledForm = { ...emptySetup(model), trigger: 'scheduled' as const }
+    const { max_samples: _omitted, ...watch } = exported.observations[0]
+    const recovery = exported.recovery.map((item) => ({
+      ...item,
+      parameters: { ...item.parameters, extra: 1, idempotency_key: 'typed' },
+    }))
+    const imported = importSetup(
+      { ...exported, trigger: 'manual', observations: [watch], recovery },
+      model,
+      scheduledForm,
+    )
+    expect(imported.draft.trigger).toBe('manual')
+    expect(imported.draft.watches[0].max_samples).toBe(100)
+    expect(imported.problems).toEqual([
+      expect.stringMatching(/Recovery input extra is not an editable input/),
+      expect.stringMatching(/Recovery input idempotency_key is not an editable input/),
+    ])
+    expect(
+      Object.keys(setupBindings(imported.draft, model).bindings.recovery[0].parameters),
+    ).toEqual(['record_id', 'run_id', 'expected_version'])
+    expect(importSetup({}, model, scheduledForm).draft.trigger).toBe('manual')
+  })
+
   it('skips imported rules that do not belong to this preview and says so', () => {
     const model = setupModel(preview())
     const { draft, problems } = importSetup(
