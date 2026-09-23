@@ -1,5 +1,6 @@
 """Executable contracts. Parsing history never consults the wall clock."""
 
+from collections.abc import Iterator
 from datetime import datetime
 from typing import Annotated, Literal, Self
 from uuid import UUID
@@ -129,6 +130,419 @@ def require_mutation_receipt(operation: OperationDefinition) -> None:
             )
 
 
+IssueSection = Literal["preparation", "observations", "objectives", "recovery"]
+
+
+class ExecutionIssue(Contract):
+    """One reason a pinned preparation and its run bindings are not executable."""
+
+    code: str
+    message: str
+    section: IssueSection
+    index: int | None = None
+    step_id: UUID | None = None
+    objective_id: UUID | None = None
+    configuration_id: UUID | None = None
+    field: str | None = None
+
+
+ORDERED_TYPES = {"integer", "number", "datetime"}
+
+
+def _duplicates(keys: list[UUID]) -> set[int]:
+    seen: set[UUID] = set()
+    repeated = set()
+    for index, key in enumerate(keys):
+        if key in seen:
+            repeated.add(index)
+        seen.add(key)
+    return repeated
+
+
+def execution_issues(
+    prep: PreparationManifest,
+    observations: list[Observation],
+    objectives: list[ObjectiveRule],
+    recovery: list[RecoveryBinding],
+) -> Iterator[ExecutionIssue]:
+    """Yield every issue in validator order; RunManifest rejects the first one verbatim."""
+
+    try:
+        operations = validate_bindings(prep.draft, prep.configurations, prep.scenario)
+    except ValueError as exc:
+        yield ExecutionIssue(code="invalid_bindings", message=str(exc), section="preparation")
+        return
+    window = prep.draft.window
+    span = (window.ends_at - window.starts_at).total_seconds() if window else None
+    if not operations or window is None:
+        yield ExecutionIssue(
+            code="missing_operations_or_window",
+            message="Execution needs operations and an explicit bounded window",
+            section="preparation",
+        )
+    if not prep.draft.recovery.strip():
+        yield ExecutionIssue(
+            code="missing_recovery_decision",
+            message="Record a recovery decision before execution",
+            section="preparation",
+        )
+    if span is not None and sum(step.wait_seconds or 0 for step in prep.draft.steps) > span:
+        yield ExecutionIssue(
+            code="waits_exceed_window",
+            message="Fixed waits cannot exceed the execution window",
+            section="preparation",
+        )
+    for config in prep.configurations:
+        content = config.content
+        target_checks = (
+            (
+                config.connection_kind not in {"sql", "rest"},
+                "unsupported_target_kind",
+                "Graph and MCP execution are not implemented",
+            ),
+            (
+                content.classification == "unknown",
+                "unclassified_target",
+                "Target classification is unresolved",
+            ),
+            (
+                not all([content.resource_id, content.endpoint, content.identity_ref]),
+                "incomplete_target",
+                "Execution targets must be complete",
+            ),
+            (
+                config.connection_kind == "sql" and not content.database,
+                "missing_sql_database",
+                "SQL execution requires an explicit database",
+            ),
+        )
+        for failed, code, message in target_checks:
+            if failed:
+                yield ExecutionIssue(
+                    code=code, message=message, section="preparation", configuration_id=config.id
+                )
+    for step in prep.draft.steps:
+        if step.kind != "operation":
+            continue
+        operation = operations.get(step.id)
+        if operation is None or operation.effect == "notify":
+            yield ExecutionIssue(
+                code="unsupported_operation",
+                message="Every operation needs a supported exact binding",
+                section="preparation",
+                step_id=step.id,
+            )
+            continue
+        try:
+            require_mutation_receipt(operation)
+        except ValueError as exc:
+            yield ExecutionIssue(
+                code="operation_receipt_contract",
+                message=str(exc),
+                section="preparation",
+                step_id=step.id,
+            )
+        for field in operation.parameters:
+            if operation.invocation.kind == "sql" and field.name == "idempotency_key":
+                if step.parameters.get(field.name) is not None:
+                    yield ExecutionIssue(
+                        code="sql_idempotency_literal",
+                        message="Clear the SQL idempotency_key literal; execution explicitly owns that binding",
+                        section="preparation",
+                        step_id=step.id,
+                        field=field.name,
+                    )
+                elif (
+                    field.type != "string"
+                    or field.choices
+                    or (field.max_length is not None and field.max_length < 64)
+                ):
+                    yield ExecutionIssue(
+                        code="sql_idempotency_field_invalid",
+                        message="SQL idempotency_key must accommodate a dispatcher SHA-256 key",
+                        section="preparation",
+                        step_id=step.id,
+                        field=field.name,
+                    )
+                continue
+            if field.required and step.parameters.get(field.name) is None:
+                yield ExecutionIssue(
+                    code="unresolved_parameter",
+                    message=f"Unresolved operation parameter: {field.name}",
+                    section="preparation",
+                    step_id=step.id,
+                    field=field.name,
+                )
+    yield from _observation_issues(operations, observations, span)
+    yield from _objective_issues(prep, operations, objectives)
+    yield from _recovery_issues(prep, operations, recovery)
+
+
+def _at(template: ExecutionIssue, code: str, message: str, **changes: object) -> ExecutionIssue:
+    return template.model_copy(update={"code": code, "message": message, **changes})
+
+
+def _observation_issues(
+    operations: dict[UUID, OperationDefinition],
+    observations: list[Observation],
+    span: float | None,
+) -> Iterator[ExecutionIssue]:
+    repeated = _duplicates([item.step_id for item in observations])
+    for index in sorted(repeated):
+        yield ExecutionIssue(
+            code="duplicate_observation",
+            message="Only one observation policy is allowed per read step",
+            section="observations",
+            index=index,
+            step_id=observations[index].step_id,
+        )
+    for index, item in enumerate(observations):
+        if index in repeated:
+            continue
+        here = ExecutionIssue(
+            code="",
+            message="",
+            section="observations",
+            index=index,
+            step_id=item.step_id,
+            field=item.field,
+        )
+        operation = operations.get(item.step_id)
+        if operation is None or operation.effect != "read":
+            yield _at(here, "observation_not_read", "Only registered read operations may be polled")
+            continue
+        observed_field = next(
+            (field for field in operation.results if field.name == item.field), None
+        )
+        if observed_field is None:
+            yield _at(
+                here, "observation_field_undeclared", "Observation must compare a declared result"
+            )
+            continue
+        try:
+            validate_scalar(observed_field, item.value, constraints=False)
+        except ValueError as exc:
+            yield _at(here, "observation_value_invalid", str(exc))
+            continue
+        if item.operator not in {"eq", "ne"} and observed_field.type not in ORDERED_TYPES:
+            yield _at(
+                here,
+                "observation_ordered_type",
+                "Ordered observation requires numeric or datetime output",
+            )
+        if span is not None and item.timeout_seconds > span:
+            yield _at(
+                here,
+                "observation_timeout_exceeds_window",
+                "Observation timeout exceeds the execution window",
+            )
+
+
+def _objective_issues(
+    prep: PreparationManifest,
+    operations: dict[UUID, OperationDefinition],
+    objectives: list[ObjectiveRule],
+) -> Iterator[ExecutionIssue]:
+    objective_ids = {item.id for item in prep.scenario.content.objectives}
+    repeated = _duplicates([item.objective_id for item in objectives])
+    for index in sorted(repeated):
+        yield ExecutionIssue(
+            code="duplicate_objective_rule",
+            message="Objective bindings must be unique",
+            section="objectives",
+            index=index,
+            objective_id=objectives[index].objective_id,
+        )
+    for index, rule in enumerate(objectives):
+        if index in repeated:
+            continue
+        here = ExecutionIssue(
+            code="",
+            message="",
+            section="objectives",
+            index=index,
+            step_id=rule.step_id,
+            objective_id=rule.objective_id,
+            field=rule.field,
+        )
+        if rule.objective_id not in objective_ids:
+            yield _at(
+                here,
+                "objective_unknown",
+                "Assessment must reference a pinned scenario objective",
+            )
+            continue
+        references = [(rule.step_id, rule.field)]
+        if rule.anchor_step_id and rule.anchor_field:
+            references.append((rule.anchor_step_id, rule.anchor_field))
+        if rule.source_time_field:
+            references.append((rule.step_id, rule.source_time_field))
+        if isinstance(rule.value, PriorResultReference):
+            references.append((rule.value.source_step_id, rule.value.field))
+        undeclared = [
+            (sid, name)
+            for sid, name in references
+            if sid not in operations
+            or not any(field.name == name for field in operations[sid].results)
+        ]
+        if undeclared:
+            yield _at(
+                here,
+                "objective_reference_undeclared",
+                "Objective evidence must reference declared operation results",
+                step_id=undeclared[0][0],
+                field=undeclared[0][1],
+            )
+            continue
+        compared_field = next(
+            field for field in operations[rule.step_id].results if field.name == rule.field
+        )
+        if rule.operator not in {"eq", "ne"} and compared_field.type not in ORDERED_TYPES:
+            yield _at(
+                here,
+                "objective_ordered_type",
+                "Ordered assessment requires numeric or datetime evidence",
+            )
+        if isinstance(rule.value, PriorResultReference):
+            value_field = next(
+                field
+                for field in operations[rule.value.source_step_id].results
+                if field.name == rule.value.field
+            )
+            if value_field.type != compared_field.type:
+                yield _at(
+                    here,
+                    "objective_value_type_mismatch",
+                    "Assessment comparison fields must have matching types",
+                )
+        else:
+            try:
+                validate_scalar(compared_field, rule.value, constraints=False)
+            except ValueError as exc:
+                yield _at(here, "objective_value_invalid", str(exc))
+        clocks = []
+        if rule.anchor_step_id and rule.anchor_field:
+            clocks.append((rule.anchor_step_id, rule.anchor_field))
+        if rule.source_time_field:
+            clocks.append((rule.step_id, rule.source_time_field))
+        for clock_step, clock_field in clocks:
+            clock = next(
+                field for field in operations[clock_step].results if field.name == clock_field
+            )
+            if clock.type != "datetime":
+                yield _at(
+                    here,
+                    "objective_clock_not_datetime",
+                    "Assessment clocks must reference declared datetime fields",
+                    step_id=clock_step,
+                    field=clock_field,
+                )
+                break
+
+
+def _recovery_issues(
+    prep: PreparationManifest,
+    operations: dict[UUID, OperationDefinition],
+    recovery: list[RecoveryBinding],
+) -> Iterator[ExecutionIssue]:
+    configs = {item.id: item for item in prep.configurations}
+    repeated = _duplicates([item.step_id for item in recovery])
+    for index in sorted(repeated):
+        yield ExecutionIssue(
+            code="duplicate_recovery",
+            message="Only one recovery binding is allowed per effect",
+            section="recovery",
+            index=index,
+            step_id=recovery[index].step_id,
+        )
+    for index, binding in enumerate(recovery):
+        if index in repeated:
+            continue
+        here = ExecutionIssue(
+            code="",
+            message="",
+            section="recovery",
+            index=index,
+            step_id=binding.step_id,
+            configuration_id=binding.binding.configuration_id,
+        )
+        source = operations.get(binding.step_id)
+        recovery_config = configs.get(binding.binding.configuration_id)
+        operation = (
+            next(
+                (
+                    item
+                    for item in recovery_config.content.catalog.operations
+                    if (item.key, item.version)
+                    == (binding.binding.operation_key, binding.binding.operation_version)
+                ),
+                None,
+            )
+            if recovery_config
+            else None
+        )
+        if (
+            source is None
+            or source.effect != "write"
+            or operation is None
+            or operation.effect != "write"
+        ):
+            yield _at(
+                here,
+                "recovery_binding_invalid",
+                "Recovery must bind a registered write for a recorded write",
+            )
+            continue
+        try:
+            require_mutation_receipt(operation)
+        except ValueError as exc:
+            yield _at(here, "recovery_receipt_contract", str(exc))
+            continue
+        names = {field.name for field in operation.parameters}
+        if not set(binding.parameters) <= names:
+            yield _at(here, "recovery_parameter_undeclared", "Recovery parameters must be declared")
+            continue
+        for field in operation.parameters:
+            value = binding.parameters.get(field.name)
+            if value is None and field.required and field.name != "idempotency_key":
+                yield _at(
+                    here,
+                    "recovery_parameter_incomplete",
+                    "Recovery parameters must be complete",
+                    field=field.name,
+                )
+            elif isinstance(value, PriorResultReference):
+                origin = operations.get(value.source_step_id)
+                result = (
+                    next((item for item in origin.results if item.name == value.field), None)
+                    if origin
+                    else None
+                )
+                if result is None or not result.required or result.type != field.type:
+                    yield _at(
+                        here,
+                        "recovery_reference_invalid",
+                        "Recovery requires matching required recorded results",
+                        field=field.name,
+                    )
+            elif value is not None:
+                try:
+                    validate_scalar(field, value)
+                except ValueError as exc:
+                    yield _at(here, "recovery_value_invalid", str(exc), field=field.name)
+
+
+def planned_attempts(
+    prep: PreparationManifest, observations: list[Observation], recovery: list[RecoveryBinding]
+) -> int:
+    """Worst-case exercise and recovery attempts, excluding explicit reconciliation retries."""
+
+    sampled = {item.step_id: item.max_samples for item in observations}
+    return sum(
+        sampled.get(step.id, 1) for step in prep.draft.steps if step.kind == "operation"
+    ) + len(recovery)
+
+
 class RunManifest(Contract):
     schema_version: Literal["exercise-execution/v2"] = "exercise-execution/v2"
     run_id: UUID
@@ -142,175 +556,10 @@ class RunManifest(Contract):
 
     @model_validator(mode="after")
     def executable(self) -> Self:
-        prep = self.preparation
-        operations = validate_bindings(prep.draft, prep.configurations, prep.scenario)
-        if not operations or prep.draft.window is None:
-            raise ValueError("Execution needs operations and an explicit bounded window")
-        if not prep.draft.recovery.strip():
-            raise ValueError("Record a recovery decision before execution")
-        if (
-            sum(step.wait_seconds or 0 for step in prep.draft.steps)
-            > (prep.draft.window.ends_at - prep.draft.window.starts_at).total_seconds()
+        for issue in execution_issues(
+            self.preparation, self.observations, self.objectives, self.recovery
         ):
-            raise ValueError("Fixed waits cannot exceed the execution window")
-        for config in prep.configurations:
-            content = config.content
-            if config.connection_kind not in {"sql", "rest"}:
-                raise ValueError("Graph and MCP execution are not implemented")
-            if content.classification == "unknown":
-                raise ValueError("Target classification is unresolved")
-            if not all([content.resource_id, content.endpoint, content.identity_ref]):
-                raise ValueError("Execution targets must be complete")
-            if config.connection_kind == "sql" and not content.database:
-                raise ValueError("SQL execution requires an explicit database")
-        for step in prep.draft.steps:
-            if step.kind != "operation":
-                continue
-            operation = operations.get(step.id)
-            if operation is None or operation.effect == "notify":
-                raise ValueError("Every operation needs a supported exact binding")
-            require_mutation_receipt(operation)
-            for field in operation.parameters:
-                if operation.invocation.kind == "sql" and field.name == "idempotency_key":
-                    if step.parameters.get(field.name) is not None:
-                        raise ValueError(
-                            "Clear the SQL idempotency_key literal; execution explicitly owns that binding"
-                        )
-                    if (
-                        field.type != "string"
-                        or field.choices
-                        or (field.max_length is not None and field.max_length < 64)
-                    ):
-                        raise ValueError(
-                            "SQL idempotency_key must accommodate a dispatcher SHA-256 key"
-                        )
-                    continue
-                if field.required and step.parameters.get(field.name) is None:
-                    raise ValueError(f"Unresolved operation parameter: {field.name}")
-        if len({item.step_id for item in self.observations}) != len(self.observations):
-            raise ValueError("Only one observation policy is allowed per read step")
-        for item in self.observations:
-            operation = operations.get(item.step_id)
-            if operation is None or operation.effect != "read":
-                raise ValueError("Only registered read operations may be polled")
-            observed_field = next(
-                (field for field in operation.results if field.name == item.field), None
-            )
-            if observed_field is None:
-                raise ValueError("Observation must compare a declared result")
-            validate_scalar(observed_field, item.value, constraints=False)
-            if item.operator not in {"eq", "ne"} and observed_field.type not in {
-                "integer",
-                "number",
-                "datetime",
-            }:
-                raise ValueError("Ordered observation requires numeric or datetime output")
-            if (
-                item.timeout_seconds
-                > (prep.draft.window.ends_at - prep.draft.window.starts_at).total_seconds()
-            ):
-                raise ValueError("Observation timeout exceeds the execution window")
-        objective_ids = {item.id for item in prep.scenario.content.objectives}
-        if len({item.objective_id for item in self.objectives}) != len(self.objectives):
-            raise ValueError("Objective bindings must be unique")
-        for rule in self.objectives:
-            if rule.objective_id not in objective_ids:
-                raise ValueError("Assessment must reference a pinned scenario objective")
-            references = [(rule.step_id, rule.field)]
-            if rule.anchor_step_id and rule.anchor_field:
-                references.append((rule.anchor_step_id, rule.anchor_field))
-            if rule.source_time_field:
-                references.append((rule.step_id, rule.source_time_field))
-            if isinstance(rule.value, PriorResultReference):
-                references.append((rule.value.source_step_id, rule.value.field))
-            for sid, field_name in references:
-                operation = operations.get(sid)
-                if operation is None or not any(
-                    field.name == field_name for field in operation.results
-                ):
-                    raise ValueError("Objective evidence must reference declared operation results")
-            compared_field = next(
-                field for field in operations[rule.step_id].results if field.name == rule.field
-            )
-            if rule.operator not in {"eq", "ne"} and compared_field.type not in {
-                "integer",
-                "number",
-                "datetime",
-            }:
-                raise ValueError("Ordered assessment requires numeric or datetime evidence")
-            if isinstance(rule.value, PriorResultReference):
-                value_field = next(
-                    field
-                    for field in operations[rule.value.source_step_id].results
-                    if field.name == rule.value.field
-                )
-                if value_field.type != compared_field.type:
-                    raise ValueError("Assessment comparison fields must have matching types")
-            else:
-                validate_scalar(compared_field, rule.value, constraints=False)
-            clocks = []
-            if rule.anchor_step_id and rule.anchor_field:
-                clocks.append((rule.anchor_step_id, rule.anchor_field))
-            if rule.source_time_field:
-                clocks.append((rule.step_id, rule.source_time_field))
-            for clock_step, clock_field in clocks:
-                if (
-                    next(
-                        field
-                        for field in operations[clock_step].results
-                        if field.name == clock_field
-                    ).type
-                    != "datetime"
-                ):
-                    raise ValueError("Assessment clocks must reference declared datetime fields")
-        configs = {item.id: item for item in prep.configurations}
-        if len({item.step_id for item in self.recovery}) != len(self.recovery):
-            raise ValueError("Only one recovery binding is allowed per effect")
-        for recovery in self.recovery:
-            source = operations.get(recovery.step_id)
-            recovery_config = configs.get(recovery.binding.configuration_id)
-            operation = (
-                next(
-                    (
-                        item
-                        for item in recovery_config.content.catalog.operations
-                        if (item.key, item.version)
-                        == (recovery.binding.operation_key, recovery.binding.operation_version)
-                    ),
-                    None,
-                )
-                if recovery_config
-                else None
-            )
-            if (
-                source is None
-                or source.effect != "write"
-                or operation is None
-                or operation.effect != "write"
-            ):
-                raise ValueError("Recovery must bind a registered write for a recorded write")
-            require_mutation_receipt(operation)
-            names = {field.name for field in operation.parameters}
-            if not set(recovery.parameters) <= names:
-                raise ValueError("Recovery parameters must be declared")
-            for field in operation.parameters:
-                value = recovery.parameters.get(field.name)
-                if value is None and field.required and field.name != "idempotency_key":
-                    raise ValueError("Recovery parameters must be complete")
-                if isinstance(value, PriorResultReference):
-                    origin = operations.get(value.source_step_id)
-                    result = (
-                        next(
-                            (result for result in origin.results if result.name == value.field),
-                            None,
-                        )
-                        if origin
-                        else None
-                    )
-                    if result is None or not result.required or result.type != field.type:
-                        raise ValueError("Recovery requires matching required recorded results")
-                elif value is not None:
-                    validate_scalar(field, value)
+            raise ValueError(issue.message)
         return self
 
     @property
@@ -418,6 +667,67 @@ class RunAuthorizationView(Contract):
     readiness: list[ReadinessView]
 
 
+BlockerRemedy = Literal[
+    "workspace_access",
+    "run_access",
+    "runtime",
+    "target_bindings",
+    "preparation",
+    "environment_policy",
+    "readiness",
+    "assets",
+    "authorize",
+    "approval",
+    "run_state",
+]
+
+
+class RunBlocker(Contract):
+    """A current reason an action is unavailable and who can resolve it."""
+
+    code: str
+    message: str
+    remedy: BlockerRemedy
+    environment_id: UUID | None = None
+    configuration_id: UUID | None = None
+
+
+class PreflightTarget(Contract):
+    configuration_id: UUID
+    connection_name: str
+    connection_kind: Literal["sql", "rest", "graph"]
+    environment_id: UUID
+    environment_name: str
+    classification: Literal["unknown", "nonproduction", "production"]
+    authority: TargetAuthorityView | None
+    readiness: ReadinessView | None
+    latest_readiness: ReadinessView | None
+
+
+class PreflightRecovery(Contract):
+    step_id: UUID
+    label: str
+    mode: Literal["automatic", "manual"]
+
+
+class RunPreflightView(Contract):
+    """A non-mutating evaluation of a proposed run; it is never execution authority."""
+
+    valid: bool
+    checked_at: str
+    trigger: Literal["manual", "scheduled"]
+    window_starts_at: str | None
+    window_ends_at: str | None
+    max_operations: int
+    planned_attempts: int
+    approval_required: bool | None
+    environments: list[EnvironmentPolicyView]
+    targets: list[PreflightTarget]
+    recovery: list[PreflightRecovery]
+    issues: list[ExecutionIssue]
+    blockers: list[RunBlocker]
+
+
 class RunView(Contract):
     id: UUID
     board_id: UUID
@@ -435,6 +745,7 @@ class RunView(Contract):
         "not_required", "required", "approved", "rejected", "invalid", "unresolved"
     ]
     blockers: list[str]
+    blocker_details: list[RunBlocker]
     can_operate: bool
     can_stop: bool
     can_review: bool

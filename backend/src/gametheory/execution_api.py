@@ -12,6 +12,7 @@ from gametheory.execution import (
     RunApprovalInput,
     RunControl,
     RunCreate,
+    RunPreflightView,
     RunSummary,
     RunView,
 )
@@ -67,6 +68,16 @@ def runs(wid: UUID, bid: UUID, db: DB, actor: Actor) -> list[RunSummary]:
         )
         for record, state in records
     ]
+
+
+@router.post("/boards/{bid}/runs/preflight", response_model=RunPreflightView)
+def preflight_run(
+    wid: UUID, bid: UUID, body: RunCreate, db: DB, actor: Actor, if_match: Match = None
+) -> RunPreflightView:
+    """Check a proposed run without creating, authorizing, or dispatching anything."""
+    return service.preflight_run(
+        db, actor, str(wid), str(bid), body, expected_version(if_match, "board")
+    )
 
 
 @router.post(

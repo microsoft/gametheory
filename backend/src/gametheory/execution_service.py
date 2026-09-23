@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from datetime import UTC, timedelta
-from uuid import UUID, uuid5
+from uuid import UUID, uuid4, uuid5
 
 from fastapi import HTTPException
 from pydantic import TypeAdapter
@@ -12,20 +12,27 @@ from gametheory.auth import Principal, authorize, is_admin, require_admin
 from gametheory.config import get_settings
 from gametheory.environment_policy import latest_policy, policy_view
 from gametheory.execution import (
+    BlockerRemedy,
     Capability,
     ExecutionGrantInput,
     ExecutionGrantView,
     ManualRecoveryInput,
+    PreflightRecovery,
+    PreflightTarget,
     ReadinessView,
     RunApprovalInput,
     RunAuthorizationView,
+    RunBlocker,
     RunControl,
     RunCreate,
     RunEventView,
     RunManifest,
+    RunPreflightView,
     RunStepView,
     RunView,
     TargetAuthorityView,
+    execution_issues,
+    planned_attempts,
 )
 from gametheory.execution_adapters import TargetBinding, binding_for, bindings
 from gametheory.persistence import (
@@ -37,6 +44,7 @@ from gametheory.persistence import (
     ExecutionGrantRevocation,
     ExerciseRun,
     ExerciseRunState,
+    PreparationBoard,
     PreparationPreview,
     RunApproval,
     RunApprovalRevocation,
@@ -58,6 +66,7 @@ from gametheory.preparation import (
     PriorResultReference,
     Scalar,
     canonical_digest,
+    validate_bindings,
 )
 from gametheory.preparation_service import (
     board_record,
@@ -224,7 +233,37 @@ def load_run(
     return run, state, manifest
 
 
-def reviewer_allowed(db: Session, actor: Principal, run: ExerciseRun) -> bool:
+@dataclass(frozen=True)
+class PreflightRun:
+    """An unsaved run subject. Preflight evaluates authority without persisting a run."""
+
+    id: str
+    workspace_id: str
+    board_id: str
+    operator: str
+    grant_id: str
+
+
+@dataclass(frozen=True)
+class PreflightState:
+    phase: str = "exercise"
+    context_id: str | None = None
+
+
+RunSubject = ExerciseRun | PreflightRun
+RunPhase = ExerciseRunState | PreflightState
+TARGET_BLOCKERS: dict[str, tuple[str, BlockerRemedy]] = {
+    "configuration": ("configuration_changed", "preparation"),
+    "environment": ("environment_unavailable", "environment_policy"),
+    "policy": ("environment_execution_disabled", "environment_policy"),
+    "classification": ("classification_conflict", "environment_policy"),
+    "binding": ("target_binding_rejected", "target_bindings"),
+    "operation": ("operation_not_bound", "target_bindings"),
+    "readiness": ("readiness_missing", "readiness"),
+}
+
+
+def reviewer_allowed(db: Session, actor: Principal, run: RunSubject) -> bool:
     if (
         actor.object_id == run.operator
         or grant_record(db, run.workspace_id, actor.object_id, "reviewer") is None
@@ -245,7 +284,9 @@ class Authorization:
     policies: dict[str, int] = field(default_factory=dict)
     targets: dict[UUID, TargetBinding] = field(default_factory=dict)
     readiness: list[str] = field(default_factory=list)
+    receipts: dict[UUID, str] = field(default_factory=dict)
     blockers: list[str] = field(default_factory=list)
+    details: list[RunBlocker] = field(default_factory=list)
     approval_status: str = "not_required"
     approval: RunApproval | None = None
 
@@ -253,12 +294,32 @@ class Authorization:
     def binding_digest(self) -> str:
         return canonical_digest({str(cid): binding.digest for cid, binding in self.targets.items()})
 
+    def block(
+        self,
+        code: str,
+        message: str,
+        remedy: BlockerRemedy,
+        *,
+        environment_id: UUID | None = None,
+        configuration_id: UUID | None = None,
+    ) -> None:
+        self.blockers.append(message)
+        self.details.append(
+            RunBlocker(
+                code=code,
+                message=message,
+                remedy=remedy,
+                environment_id=environment_id,
+                configuration_id=configuration_id,
+            )
+        )
+
 
 def check_authorization(
     db: Session,
     actor: Principal,
-    run: ExerciseRun,
-    state: ExerciseRunState,
+    run: RunSubject,
+    state: RunPhase,
     manifest: RunManifest,
     *,
     require_context: bool = True,
@@ -269,33 +330,41 @@ def check_authorization(
     try:
         authorize(db, operator, run.workspace_id, fence=True)
     except HTTPException:
-        result.blockers.append("Run operator no longer has workspace access")
+        result.block(
+            "operator_access_lost",
+            "Run operator no longer has workspace access",
+            "workspace_access",
+        )
     grant = grant_record(db, run.workspace_id, run.operator, "operator")
     if grant is None or grant.id != run.grant_id:
-        result.blockers.append("Original operator grant is no longer active")
+        result.block(
+            "operator_grant_inactive", "Original operator grant is no longer active", "run_access"
+        )
     settings = get_settings()
     if not settings.execution_enabled:
-        result.blockers.append("Exercise runtime is disabled")
+        result.block("runtime_disabled", "Exercise runtime is disabled", "runtime")
     available: dict[UUID, TargetBinding] = {}
     try:
         available = bindings()
     except HTTPException as exc:
-        result.blockers.append(str(exc.detail))
+        result.block("bindings_unavailable", str(exc.detail), "target_bindings")
     window = manifest.preparation.draft.window
     current = now()
     if window is None or window.ends_at.replace(tzinfo=None) <= current:
-        result.blockers.append("Execution window has ended")
+        result.block("window_ended", "Execution window has ended", "preparation")
     context = db.get(RunAuthorization, state.context_id) if state.context_id else None
     pinned_readiness = json.loads(context.readiness_ids) if context and require_context else None
     for config in manifest.preparation.configurations:
         result.required |= config.content.classification == "production"
         cid = str(config.id)
+        stage = "configuration"
         try:
             current_config = configuration_record(db, operator, run.workspace_id, cid)
             if ConfigurationSnapshot.model_validate_json(
                 current_config.snapshot
             ) != config or withdrawal(db, cid):
                 raise HTTPException(409, "Configuration changed or was withdrawn")
+            stage = "environment"
             environment = db.get(Environment, str(config.environment_id))
             if environment is None or environment.organization_id != actor.tenant:
                 raise HTTPException(409, "Environment is unavailable")
@@ -308,12 +377,16 @@ def check_authorization(
                 or policy.classification == "production"
                 or config.content.classification == "production"
             )
+            stage = "policy"
             if policy.classification == "unknown" or not policy.execution_enabled:
                 raise HTTPException(409, f"Execution is not enabled for {environment.name}")
+            stage = "classification"
             if policy.classification != config.content.classification:
                 raise HTTPException(409, "Environment and target classifications conflict")
+            stage = "binding"
             target = binding_for(config, available)
             result.targets[config.id] = target
+            stage = "operation"
             for step in manifest.preparation.draft.steps:
                 if step.binding and step.binding.configuration_id == config.id:
                     operation = next(
@@ -332,6 +405,7 @@ def check_authorization(
                         == (recovery.binding.operation_key, recovery.binding.operation_version)
                     )
                     target.operation(operation)
+            stage = "readiness"
             readiness_query = select(TargetReadiness).where(
                 TargetReadiness.configuration_id == cid,
                 TargetReadiness.configuration_digest == config.digest,
@@ -353,14 +427,22 @@ def check_authorization(
                     409, "No current operator readiness receipt covering this target and window"
                 )
             result.readiness.append(evidence.id)
+            result.receipts[config.id] = evidence.id
         except HTTPException as exc:
-            result.blockers.append(f"{config.connection_name}: {exc.detail}")
+            code, remedy = TARGET_BLOCKERS[stage]
+            result.block(
+                code,
+                f"{config.connection_name}: {exc.detail}",
+                remedy,
+                environment_id=config.environment_id,
+                configuration_id=config.id,
+            )
     for asset in manifest.preparation.assets:
         try:
             if pin_asset(db, run.workspace_id, str(asset.id)) != asset:
                 raise HTTPException(409, "Asset integrity changed")
         except HTTPException:
-            result.blockers.append("A pinned asset is no longer available")
+            result.block("asset_unavailable", "A pinned asset is no longer available", "assets")
     context_matches = False
     if context:
         try:
@@ -379,15 +461,19 @@ def check_authorization(
                 and context.approval_required == result.required
             )
         except HTTPException as exc:
-            result.blockers.append(str(exc.detail))
+            result.block("authorization_invalid", str(exc.detail), "authorize")
     if require_context:
         if context is None:
-            result.blockers.append(
-                "Authorize this exact run under the current environment policies"
+            result.block(
+                "authorization_required",
+                "Authorize this exact run under the current environment policies",
+                "authorize",
             )
         elif not context_matches:
-            result.blockers.append(
-                "Authorization context changed; explicit reauthorization is required"
+            result.block(
+                "authorization_changed",
+                "Authorization context changed; explicit reauthorization is required",
+                "authorize",
             )
     result.policy_resolved &= set(result.policies) == {
         str(config.environment_id) for config in manifest.preparation.configurations
@@ -424,10 +510,18 @@ def check_authorization(
             ):
                 result.approval_status = "approved"
     if require_approval and result.required and result.approval_status != "approved":
-        result.blockers.append("A current independent execution approval is required")
+        result.block(
+            "approval_required",
+            "A current independent execution approval is required",
+            "approval",
+        )
     if not result.policy_resolved:
         result.approval_status = "unresolved"
-        result.blockers.append("Environment approval policy could not be resolved")
+        result.block(
+            "policy_unresolved",
+            "Environment approval policy could not be resolved",
+            "environment_policy",
+        )
     return result
 
 
@@ -459,7 +553,14 @@ def run_view(
         try:
             authority = authorization_view(db, run, state.context_id, manifest)
         except HTTPException as exc:
-            check.blockers.append(str(exc.detail))
+            check.block("authorization_unavailable", str(exc.detail), "authorize")
+    details = (
+        [RunBlocker(code="run_state", message=state.reason, remedy="run_state")]
+        if state.reason
+        else []
+    ) + check.details
+    # Keep the same order as the string list, preferring the most specific code per message.
+    unique_details = list({item.message: item for item in details}.values())
     events = list(
         db.scalars(
             select(RunEvent)
@@ -491,6 +592,7 @@ def run_view(
             "blockers": list(
                 dict.fromkeys(([state.reason] if state.reason else []) + check.blockers)
             ),
+            "blocker_details": unique_details,
             "can_operate": actor.object_id == run.operator
             and operator_grant is not None
             and operator_grant.id == run.grant_id,
@@ -559,39 +661,57 @@ def authorization_view(
         receipt = db.get(TargetReadiness, receipt_id)
         if receipt is None or receipt.configuration_id not in configs:
             raise HTTPException(409, "Execution readiness evidence is unavailable")
-        receipts.append(
-            ReadinessView(
-                id=UUID(receipt.id),
-                configuration_id=UUID(receipt.configuration_id),
-                checked_at=timestamp(receipt.checked_at),
-                expires_at=timestamp(receipt.expires_at),
-                evidence_reference=receipt.evidence_reference,
-                operator=receipt.actor,
-            )
-        )
+        receipts.append(readiness_view(receipt))
     return RunAuthorizationView(
         id=UUID(context.id),
         created_by=UUID(context.actor),
         created_at=timestamp(context.created_at),
         policies=policies,
         readiness=receipts,
-        targets=[
-            TargetAuthorityView(
-                configuration_id=target.configuration_id,
-                resource_id=target.resource_id,
-                endpoint=target.endpoint,
-                database=target.database,
-                identity_ref=target.identity_ref,
-                client_id=target.client_id,
-                token_scope=target.token_scope,
-                operation_digests=[item.digest for item in target.operations],
-                replayable_operations=[
-                    item.digest for item in target.operations if item.safe_replay
-                ],
-            )
-            for target in targets
-        ],
+        targets=[target_authority(target) for target in targets],
     )
+
+
+def readiness_view(receipt: TargetReadiness) -> ReadinessView:
+    return ReadinessView(
+        id=UUID(receipt.id),
+        configuration_id=UUID(receipt.configuration_id),
+        checked_at=timestamp(receipt.checked_at),
+        expires_at=timestamp(receipt.expires_at),
+        evidence_reference=receipt.evidence_reference,
+        operator=receipt.actor,
+    )
+
+
+def target_authority(target: TargetBinding) -> TargetAuthorityView:
+    return TargetAuthorityView(
+        configuration_id=target.configuration_id,
+        resource_id=target.resource_id,
+        endpoint=target.endpoint,
+        database=target.database,
+        identity_ref=target.identity_ref,
+        client_id=target.client_id,
+        token_scope=target.token_scope,
+        operation_digests=[item.digest for item in target.operations],
+        replayable_operations=[item.digest for item in target.operations if item.safe_replay],
+    )
+
+
+def pinned_preparation(
+    db: Session, actor: Principal, wid: str, board: PreparationBoard, body: RunCreate
+) -> PreparationManifest:
+    preview = db.get(PreparationPreview, str(body.preview_id))
+    if (
+        preview is None
+        or preview.board_id != board.id
+        or preview.board_version != board.version
+        or preview.digest != body.preview_digest
+    ):
+        raise HTTPException(409, "Freeze and select the exact current preparation preview")
+    require_preview_access(db, actor, wid, preview)
+    if canonical_digest(json.loads(preview.manifest)) != preview.digest:
+        raise HTTPException(409, "Preview integrity check failed")
+    return PreparationManifest.model_validate_json(preview.manifest)
 
 
 def create_run(
@@ -607,22 +727,12 @@ def create_run(
     grant = grant_record(db, wid, actor.object_id, "operator")
     if grant is None:
         raise HTTPException(403, "An explicit execution operator grant is required")
-    preview = db.get(PreparationPreview, str(body.preview_id))
-    if (
-        preview is None
-        or preview.board_id != bid
-        or preview.board_version != board.version
-        or preview.digest != body.preview_digest
-    ):
-        raise HTTPException(409, "Freeze and select the exact current preparation preview")
-    require_preview_access(db, actor, wid, preview)
-    if canonical_digest(json.loads(preview.manifest)) != preview.digest:
-        raise HTTPException(409, "Preview integrity check failed")
+    preparation = pinned_preparation(db, actor, wid, board, body)
     rid = new_id()
     try:
         manifest = RunManifest(
             run_id=UUID(rid),
-            preparation=PreparationManifest.model_validate_json(preview.manifest),
+            preparation=preparation,
             trigger=body.trigger,
             observations=body.observations,
             objectives=body.objectives,
@@ -649,6 +759,127 @@ def create_run(
     audit(db, actor, "execution.prepared", rid, wid, correlation=correlation)
     db.flush()
     return run_view(db, actor, run, state, manifest)
+
+
+def preflight_run(
+    db: Session, actor: Principal, wid: str, bid: str, body: RunCreate, version: int
+) -> RunPreflightView:
+    """Evaluate a proposed run exactly as creation and authorization would, persisting nothing."""
+
+    board = board_record(db, actor, wid, bid, version=version)
+    grant = grant_record(db, wid, actor.object_id, "operator")
+    if grant is None:
+        raise HTTPException(403, "An explicit execution operator grant is required")
+    preparation = pinned_preparation(db, actor, wid, board, body)
+    issues = list(execution_issues(preparation, body.observations, body.objectives, body.recovery))
+    flagged = {(issue.section, issue.index) for issue in issues if issue.index is not None}
+    usable_recovery = [
+        item for index, item in enumerate(body.recovery) if ("recovery", index) not in flagged
+    ]
+    # Authority is evaluated for the usable subset; this unvalidated copy is never stored.
+    manifest = RunManifest.model_construct(
+        run_id=uuid4(),
+        preparation=preparation,
+        trigger=body.trigger,
+        observations=[
+            item
+            for index, item in enumerate(body.observations)
+            if ("observations", index) not in flagged
+        ],
+        objectives=[
+            item
+            for index, item in enumerate(body.objectives)
+            if ("objectives", index) not in flagged
+        ],
+        recovery=usable_recovery,
+    )
+    check = check_authorization(
+        db,
+        actor,
+        PreflightRun(
+            id=str(manifest.run_id),
+            workspace_id=wid,
+            board_id=bid,
+            operator=actor.object_id,
+            grant_id=grant.id,
+        ),
+        PreflightState(),
+        manifest,
+        require_context=False,
+        require_approval=False,
+    )
+    environments = []
+    for eid in dict.fromkeys(str(config.environment_id) for config in preparation.configurations):
+        environment = db.get(Environment, eid)
+        if environment is None or environment.organization_id != actor.tenant:
+            continue
+        try:
+            environments.append(policy_view(environment, latest_policy(db, eid)))
+        except HTTPException:
+            continue
+    targets = []
+    for config in preparation.configurations:
+        binding = check.targets.get(config.id)
+        receipt_id = check.receipts.get(config.id)
+        current = db.get(TargetReadiness, receipt_id) if receipt_id else None
+        latest = (
+            db.scalar(
+                select(TargetReadiness)
+                .where(
+                    TargetReadiness.configuration_id == str(config.id),
+                    TargetReadiness.configuration_digest == config.digest,
+                    TargetReadiness.binding_digest == binding.digest,
+                )
+                .order_by(TargetReadiness.checked_at.desc())
+                .limit(1)
+            )
+            if binding
+            else None
+        )
+        targets.append(
+            PreflightTarget(
+                configuration_id=config.id,
+                connection_name=config.connection_name,
+                connection_kind=config.connection_kind,
+                environment_id=config.environment_id,
+                environment_name=config.environment_name,
+                classification=config.content.classification,
+                authority=target_authority(binding) if binding else None,
+                readiness=readiness_view(current) if current else None,
+                latest_readiness=readiness_view(latest) if latest else None,
+            )
+        )
+    try:
+        operations = validate_bindings(
+            preparation.draft, preparation.configurations, preparation.scenario
+        )
+    except ValueError:
+        operations = {}
+    recoverable = {item.step_id for item in usable_recovery}
+    window = preparation.draft.window
+    return RunPreflightView(
+        valid=not issues,
+        checked_at=timestamp(now()),
+        trigger=body.trigger,
+        window_starts_at=window.starts_at.isoformat() if window else None,
+        window_ends_at=window.ends_at.isoformat() if window else None,
+        max_operations=manifest.max_operations,
+        planned_attempts=planned_attempts(preparation, body.observations, body.recovery),
+        approval_required=check.required if check.policy_resolved else None,
+        environments=environments,
+        targets=targets,
+        recovery=[
+            PreflightRecovery(
+                step_id=step.id,
+                label=step.label,
+                mode="automatic" if step.id in recoverable else "manual",
+            )
+            for step in preparation.draft.steps
+            if step.id in operations and operations[step.id].effect == "write"
+        ],
+        issues=issues,
+        blockers=check.details,
+    )
 
 
 def authorize_run(
