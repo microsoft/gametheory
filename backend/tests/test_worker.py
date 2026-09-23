@@ -67,6 +67,7 @@ def test_worker_starts_before_dispatching(monkeypatch):
         "get_settings",
         lambda: SimpleNamespace(
             planning_enabled=True,
+            run_assistant_enabled=False,
             scheduler_emulator=True,
             scheduler_endpoint="http://127.0.0.1:8080",
             scheduler_taskhub="test",
