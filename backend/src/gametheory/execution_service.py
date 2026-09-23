@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass, field
 from datetime import UTC, timedelta
+from typing import Protocol
 from uuid import UUID, uuid4, uuid5
 
 from fastapi import HTTPException
@@ -51,6 +52,7 @@ from gametheory.persistence import (
     RunAuthorization,
     RunDispatch,
     RunEvent,
+    RunSetupRequest,
     RunStep,
     TargetReadiness,
     new_id,
@@ -697,8 +699,16 @@ def target_authority(target: TargetBinding) -> TargetAuthorityView:
     )
 
 
+class PreviewSelection(Protocol):
+    @property
+    def preview_id(self) -> UUID: ...
+
+    @property
+    def preview_digest(self) -> str: ...
+
+
 def pinned_preparation(
-    db: Session, actor: Principal, wid: str, board: PreparationBoard, body: RunCreate
+    db: Session, actor: Principal, wid: str, board: PreparationBoard, body: PreviewSelection
 ) -> PreparationManifest:
     preview = db.get(PreparationPreview, str(body.preview_id))
     if (
@@ -712,6 +722,29 @@ def pinned_preparation(
     if canonical_digest(json.loads(preview.manifest)) != preview.digest:
         raise HTTPException(409, "Preview integrity check failed")
     return PreparationManifest.model_validate_json(preview.manifest)
+
+
+def run_suggestion(db: Session, wid: str, bid: str, body: RunCreate) -> str | None:
+    """Verify optional suggestion provenance; the suggestion never enters the manifest."""
+
+    if body.suggestion_id is None:
+        return None
+    record = db.get(RunSetupRequest, str(body.suggestion_id))
+    if (
+        record is None
+        or record.workspace_id != wid
+        or record.board_id != bid
+        or record.preview_id != str(body.preview_id)
+        or record.preview_digest != body.preview_digest
+    ):
+        raise HTTPException(
+            409,
+            "The linked suggestion is not for this board's selected preview. "
+            "Request new suggestions, or clear the link and check again.",
+        )
+    if record.status != "proposed":
+        raise HTTPException(409, "Only a completed suggestion can be linked to a run")
+    return record.id
 
 
 def create_run(
@@ -728,6 +761,7 @@ def create_run(
     if grant is None:
         raise HTTPException(403, "An explicit execution operator grant is required")
     preparation = pinned_preparation(db, actor, wid, board, body)
+    suggestion_id = run_suggestion(db, wid, bid, body)
     rid = new_id()
     try:
         manifest = RunManifest(
@@ -755,8 +789,14 @@ def create_run(
     db.add(state)
     for step in manifest.preparation.draft.steps:
         db.add(RunStep(run_id=rid, phase="exercise", step_id=str(step.id)))
-    record_event(db, run, "run.prepared", {"actor": actor.object_id, "manifest_digest": run.digest})
+    prepared: dict[str, Scalar | None] = {"actor": actor.object_id, "manifest_digest": run.digest}
+    if suggestion_id:
+        prepared["suggestion_id"] = suggestion_id
+    record_event(db, run, "run.prepared", prepared)
     audit(db, actor, "execution.prepared", rid, wid, correlation=correlation)
+    if suggestion_id:
+        # Audit rows carry no detail; the shared correlation ties the suggestion to this run.
+        audit(db, actor, "run_setup.suggestion_used", suggestion_id, wid, correlation=correlation)
     db.flush()
     return run_view(db, actor, run, state, manifest)
 
@@ -771,6 +811,7 @@ def preflight_run(
     if grant is None:
         raise HTTPException(403, "An explicit execution operator grant is required")
     preparation = pinned_preparation(db, actor, wid, board, body)
+    run_suggestion(db, wid, bid, body)
     issues = list(execution_issues(preparation, body.observations, body.objectives, body.recovery))
     flagged = {(issue.section, issue.index) for issue in issues if issue.index is not None}
     usable_recovery = [

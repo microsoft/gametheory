@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     foundry_project_endpoint: str = ""
     model_deployment: str = ""
     planning_enabled: bool = False
+    run_assistant_enabled: bool = False
     execution_enabled: bool = False
     execution_taskhub: str = "gametheory-exercises"
     execution_bindings_file: str = ""
@@ -96,6 +97,11 @@ class Settings(BaseSettings):
                 )
             if urlparse(self.foundry_project_endpoint).scheme != "https":
                 raise ValueError("Foundry must use HTTPS")
+        if self.run_assistant_enabled and not self.planning_enabled:
+            raise ValueError(
+                "The run-check assistant uses the planning worker and model; "
+                "enable and configure planning first"
+            )
         if self.scheduler_endpoint:
             endpoint = urlparse(self.scheduler_endpoint)
             if self.scheduler_emulator:

@@ -46,6 +46,15 @@ def test_frozen_migration_compiles_to_sql_server_ddl(monkeypatch):
         assert "expires_at DATETIME2(6)" in script
         assert "REFERENCES revisions (scenario_id, version)" in script
         assert "FOREIGN KEY" in script
+        assert "CREATE TABLE run_setup_requests" in script
+        assert "CREATE TABLE run_setup_dispatch_intents" in script
+        assert "ck_run_setup_request_status" in script
+        assert "prompt NVARCHAR(4000) NOT NULL" in script
+        assert (
+            "CREATE UNIQUE INDEX uq_active_run_setup_request ON run_setup_requests (board_id) "
+            "WHERE status IN ('queued', 'running')"
+        ) in script
+        assert "REFERENCES board_previews (id)" in script
         assert "INSERT INTO alembic_version" in script
         assert all(int(size) <= 4000 for size in re.findall(r"NVARCHAR\((\d+)\)", script.upper()))
     finally:
@@ -62,6 +71,8 @@ def test_long_unicode_columns_compile_to_nvarchar_max():
         ("board_origins", "assets"),
         ("connection_configurations", "snapshot"),
         ("board_previews", "manifest"),
+        ("run_setup_requests", "context"),
+        ("run_setup_requests", "suggestion"),
     ):
         column = Base.metadata.tables[table].c[name]
         assert column.type.compile(dialect=dialect).upper() == "NVARCHAR(MAX)"

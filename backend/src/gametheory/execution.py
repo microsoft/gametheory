@@ -108,6 +108,8 @@ class RunCreate(Contract):
     observations: list[Observation] = Field(default_factory=list, max_length=100)
     objectives: list[ObjectiveRule] = Field(default_factory=list, max_length=500)
     recovery: list[RecoveryBinding] = Field(default_factory=list, max_length=100)
+    # Provenance only: recorded with the run.prepared event and audit, never in the manifest.
+    suggestion_id: UUID | None = None
 
 
 def require_mutation_receipt(operation: OperationDefinition) -> None:

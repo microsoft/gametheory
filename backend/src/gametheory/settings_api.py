@@ -28,6 +28,7 @@ class RuntimeStatus(Contract):
     sql_configured: bool
     scheduler_configured: bool
     target_bindings_configured: bool
+    run_assistant_enabled: bool
     message: str
 
 
@@ -40,6 +41,7 @@ def runtime(db: DB, actor: Actor) -> RuntimeStatus:
         sql_configured=bool(settings.sql_url),
         scheduler_configured=bool(settings.scheduler_endpoint and settings.execution_taskhub),
         target_bindings_configured=bool(settings.execution_bindings_file),
+        run_assistant_enabled=settings.run_assistant_enabled,
         message="Configuration is not live readiness. Environment policy never grants target access.",
     )
 
