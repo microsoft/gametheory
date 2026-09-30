@@ -41,13 +41,17 @@ the combined network deployment. Compilation does not verify private DNS.
 Use `schedulerName` to adopt that same scheduler into the combined deployment.
 
 For an isolated validation deployment, `deployFoundry=true` additionally creates
-a private Foundry account/project and a GPT-6-luna (`2026-09-22`) DataZoneStandard
+a private Foundry account/project and a GPT-5.6-luna (`2026-07-09`) DataZoneStandard
 deployment (50 capacity units), keeping inference within the deployment's data zone
-(US for a US-region account). GPT-6-luna has no regional Standard offering; use
-`planningModelName`/`planningModelVersion` with `planningModelSku=Standard` only for
-a model that offers it in the target region. Global routing is not an option in this
-template. The planner's `GT_PLANNER_MAX_OUTPUT_TOKENS` budget includes the model's
-reasoning tokens. Check actual model-capacity results as well as
+(US for a US-region account). Neither GPT-5.6-luna nor GPT-6-luna has a regional
+Standard offering; use `planningModelName`/`planningModelVersion` with
+`planningModelSku=Standard` only for a model that offers it in the target region.
+Global routing is not an option in this template. The planner calls the Foundry
+project Responses API. On 2026-09-30, GPT-6-luna (`2026-09-22`) returned HTTP 500
+there, while its Chat Completions and account-level Responses calls succeeded.
+Select it only after the Foundry proposal probe below passes. The planner's
+`GT_PLANNER_MAX_OUTPUT_TOKENS` budget includes the model's reasoning tokens. Check
+actual model-capacity results as well as
 catalog entries and quota; a listed SKU does not prove regional availability. The
 three DNS zones come from commercial account private-link metadata; the worker
 receives Foundry User only on this project. No hosted Agent Service or external

@@ -5,8 +5,8 @@ param subnetId string
 param workerPrincipalId string
 @allowed(['Standard', 'DataZoneStandard'])
 param modelSku string = 'DataZoneStandard'
-param modelName string = 'gpt-6-luna'
-param modelVersion string = '2026-09-22'
+param modelName string = 'gpt-5.6-luna'
+param modelVersion string = '2026-07-09'
 
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: name
