@@ -41,10 +41,13 @@ the combined network deployment. Compilation does not verify private DNS.
 Use `schedulerName` to adopt that same scheduler into the combined deployment.
 
 For an isolated validation deployment, `deployFoundry=true` additionally creates
-a private Foundry account/project and a regional GPT-4.1-mini Standard deployment
-(50 capacity units). `planningModelSku=DataZoneStandard` can instead keep inference
-within the deployment's data zone (US for a US-region account). Global routing is
-not an option in this template. Check actual model-capacity results as well as
+a private Foundry account/project and a GPT-6-luna (`2026-09-22`) DataZoneStandard
+deployment (50 capacity units), keeping inference within the deployment's data zone
+(US for a US-region account). GPT-6-luna has no regional Standard offering; use
+`planningModelName`/`planningModelVersion` with `planningModelSku=Standard` only for
+a model that offers it in the target region. Global routing is not an option in this
+template. The planner's `GT_PLANNER_MAX_OUTPUT_TOKENS` budget includes the model's
+reasoning tokens. Check actual model-capacity results as well as
 catalog entries and quota; a listed SKU does not prove regional availability. The
 three DNS zones come from commercial account private-link metadata; the worker
 receives Foundry User only on this project. No hosted Agent Service or external
