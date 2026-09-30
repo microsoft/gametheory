@@ -1,6 +1,6 @@
 # Roadmap and current status
 
-Status as of 2026-09-30, with `main` at `c87b9c4`. Update this file in the pull
+Status as of 2026-09-30, with `main` at `7bc9ba5`. Update this file in the pull
 request that changes an item's status.
 
 This roadmap sequences the work described in the
@@ -61,7 +61,9 @@ through P4.
   archived automatically, which would block pull requests and deployments.
 - Resolve #1 (missing LICENSE) consistently with the #4 decision.
 - Triage the open Dependabot updates: #6 (react-router) and #8 (vitest) for the
-  studio, and #11 (vitest), #12 (vite), and #13 (Playwright) for the lab UI.
+  studio, #18 (brace-expansion), #19 (@grpc/grpc-js), and #20 (moment) in the
+  studio's root lockfile, and #11 (vitest), #12 (vite), and #13 (Playwright) for the
+  lab UI.
 
 ### P1: Studio in the new commercial tenant (in progress)
 
@@ -76,8 +78,9 @@ and the [run-check assistant rollout](deployment.md#run-check-assistant-rollout)
 3. Apply migrations through `0005`, run `gametheory database-grants`, and bootstrap
    the first administrator.
 4. Start the applications with planning off. Enable planning, and optionally the
-   run-check assistant, only after the SQL, identity, network, and model checks
-   pass. Execution stays off.
+   run-check assistant (`enableRunAssistant=true`), only after the SQL, identity,
+   network, and model checks pass. Execution stays off. If A11 shows truncated
+   proposals, raise `plannerMaxOutputTokens`.
 
 | Item | Live gate                                                                                                                                  | Status |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------ |

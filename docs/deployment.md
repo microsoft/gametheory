@@ -107,6 +107,11 @@ because concurrent changes to a Cognitive Services account can conflict.
    using the selected package/model combination before enabling planning.
    A private Foundry project also requires worker-network connectivity and private
    DNS configuration; this template does not modify an existing project's network.
+   `plannerMaxOutputTokens` (default 6000) and `modelTimeoutSeconds` (default 120) set
+   `GT_PLANNER_MAX_OUTPUT_TOKENS` and `GT_MODEL_TIMEOUT_SECONDS` on the planning worker.
+   Raise the token limit only when live validation shows truncated proposals; reasoning
+   tokens count against it. The planning activity makes at most three attempts within
+   a ten-minute retry window, so a long model timeout leaves less room for retries.
 9. Deploy images, configure the production SPA redirect origin, and verify token
    audience/scope and workspace denial cases. Start with planning disabled until
    SQL, identity, network, and model checks pass.
@@ -219,6 +224,9 @@ target table is granted to the planning worker. The worker registers the new
 only while the setting is on. Turning it off hides the panel and returns `503` from
 the suggestion API; suggestions already linked to runs remain recorded as provenance.
 Validate the same model, identity, and network checks as planning before enabling it.
+In `infra/main.bicep`, `enableRunAssistant=true` sets the setting on the API and the
+planning worker only, and applies only together with `enablePlanning=true`; the
+`runAssistantEnabled` output reports the value that was applied.
 
 ## Partial deployment and private dependency probes
 
