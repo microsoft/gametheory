@@ -241,6 +241,9 @@ The API exposes:
 - `POST /v1/runs/{run_id}/requests` for explicitly granted service principals.
 - `GET /v1/runs/{run_id}/requests` with `limit <= 100`, sequence cursor/status.
 - `GET /v1/runs/{run_id}/requests/{request_id}`.
+- `GET .../{request_id}/milestones` with required `acknowledge_within_seconds` and
+  `allocate_within_seconds` (integers 1–604800); see
+  [authoritative milestone read](#authoritative-milestone-read).
 - `POST .../{request_id}/acknowledge` and `POST .../{request_id}/allocate`.
 - `GET /v1/runs/{run_id}/events` with `limit <= 100`, sequence cursor and optional
   record filter. Continue `next_after` until null before claiming complete evidence.
@@ -347,6 +350,53 @@ never start assessment clocks. No automatic detector or timeout sender is runnin
 a detection observation must come from separately authorized durable observation
 evidence, otherwise its assessment is indeterminate. Test clocks/identities are
 explicitly labeled and confined to tests.
+
+### Authoritative milestone read
+
+Seeing a fulfilled record later is not proof of timely fulfilment. REST
+operation `resource-request.milestones` version 1 therefore exposes bounded,
+flat, typed timing evidence for one request:
+
+```text
+GET /v1/runs/{run_id}/requests/{request_id}/milestones?acknowledge_within_seconds=600&allocate_within_seconds=1200
+```
+
+Both windows are required integers from 1 to 604800 and count inclusively from
+committed `created_at`. Enter the profile's 600 and 1200 seconds; only tests use
+shorter, labeled TEST ONLY windows. The existing read roles apply and another
+run's request returns 404. The `flood-lab-milestones/v1` response comes from one
+consistent read: it takes the writers' run lock in shared mode, so no in-flight
+writer can later commit an earlier clock value, then reads `as_of` from
+`SYSUTCDATETIME()` and applies the parameterized `assessment.py` rules.
+The shared lock is held only for that one bounded read. A participant, API or
+SQL injector write can wait behind it for at most the existing 5-second run-lock
+timeout. If that expires, the write rolls back and fails explicitly as busy or
+`outcome_unknown`; retrying the identical inputs with the same idempotency key
+reconciles it, and no data is lost.
+
+- `created_event_id` is the succeeded `request.create` event. Seeded requests
+  have none, so it and both verdicts stay null; no event is invented.
+- `acknowledged_at` and `acknowledgement_event_id` come from the succeeded
+  `request.acknowledge` event; `acknowledged` reports the record.
+- `allocated_total_by_deadline` sums distinct succeeded allocation events
+  committed by the deadline. `allocation_completed_at` and
+  `allocation_completed_event_id` name the event that first covered the
+  requested quantity. Each durable event ID counts once, so a receipt replay or
+  rejected attempt adds nothing, and `available_at` is ignored.
+- `acknowledged_on_time` and `allocated_on_time` are **true** when the milestone
+  committed at or before its deadline. They are **false** for a late committed
+  action, or for a committed partial allocation still short after the deadline
+  with complete history: every allocation record paired with its durable event
+  and matching the record total. They are **null** when undecided, inconsistent
+  or absent; a request never acknowledged stays null after its deadline.
+  Decided verdicts never change.
+
+In Game Theory's ordinary UI, register the updated REST catalog as a new
+configuration revision, add a milestones read step after the create step,
+observe it in the exercise run, and bind `acknowledged_on_time` and
+`allocated_on_time` equal to `true`. `assets/operator-and-ui-setup.md` gives the
+exact observation and all three objective rules, including detection. Neither
+package installs or seeds the other.
 
 ## Safe recovery, not universal reset
 
@@ -478,6 +528,11 @@ post-commit lost-response replay, changed payloads, actor/run/record isolation,
 grant revocation, least-privilege database roles, stored procedure idempotency,
 exactly-85%/above-threshold percentages, missing-event indeterminate evidence,
 recovery after human edits, other-operation references and repeatable cleanup.
+Milestone cases cover on-time, deadline-equal and late acknowledgement, absent
+acknowledgement before and after its deadline, seeded requests, partial then
+complete allocation, partial allocation after the deadline, backdated
+availability, replay and rejection counting, run isolation and read roles,
+verdict monotonicity, and a read that waits for an in-flight writer's clock.
 
 ### Standalone Linux CI recipe
 
@@ -556,3 +611,21 @@ were **not executed here**. Real Entra sign-in/consent and target authorization
 were not validated. Those remain live gates; fixture passes are not substitutes.
 There were no root application changes, commits, deployment, cloud operations
 or notification sends by this implementation.
+
+## Recorded bounded verification — 2026-09-23 (milestones)
+
+On the same macOS arm64 host, for the `resource-request.milestones@1` addition:
+
+- `bash scripts/verify.sh`: ruff and format checks passed; **64 unit tests
+  passed**; 16 assets and the independent OpenAPI had no drift; UI Vitest
+  (**14 passed**) and the production build passed.
+- `pytest -q tests/unit tests/sql`: **64 passed, 31 skipped**. All real-SQL
+  cases, including the 12 new milestone cases, reported the missing
+  `FLOOD_LAB_TEST_DATABASE_URL`; they run in the `flood-lab` CI job.
+- The REST catalog validated against Game Theory's exported
+  `operation-catalog-v1.schema.json`. The four existing REST operations and both
+  SQL operations are pinned by digest and unchanged. Asset bundle version is 1.2.0.
+
+No approved SQL Server host was available, so the shared-lock consistent read,
+real clock boundaries and role checks were **not executed against SQL Server
+here**; unit and offline contract checks are not substitutes for that gate.

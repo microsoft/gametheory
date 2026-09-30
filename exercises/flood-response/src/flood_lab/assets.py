@@ -8,11 +8,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from flood_lab.contracts import MAX_WINDOW_SECONDS, MILESTONES_CONTRACT_VERSION
 from flood_lab.openapi import artifact as openapi_artifact
 from flood_lab.profile import PERSONNEL, PROFILE, SHELTERS, seed_manifest
 
 ROOT = Path(__file__).resolve().parents[2]
-ASSET_VERSION = "1.1.0"
+ASSET_VERSION = "1.2.0"
 
 
 def json_bytes(value: Any) -> bytes:
@@ -76,6 +77,31 @@ def catalogs() -> dict[str, dict]:
         field("quantity_allocated", "integer", minimum=0, maximum=10000),
         field("created_at", "datetime"),
         field("needed_by", "datetime"),
+    ]
+    milestone_results = [
+        field("contract_version", "string", choices=[MILESTONES_CONTRACT_VERSION]),
+        request,
+        run,
+        field("record_version", "string", max_length=35),
+        field("status", "string", choices=["open", "acknowledged", "fulfilled"]),
+        field("quantity_requested", "integer", minimum=1, maximum=10000),
+        field("quantity_allocated", "integer", minimum=0, maximum=10000),
+        field("created_at", "datetime"),
+        field("created_event_id", "uuid", required=False),
+        field("acknowledged", "boolean"),
+        field("acknowledged_at", "datetime", required=False),
+        field("acknowledgement_event_id", "uuid", required=False),
+        field("allocated_total_by_deadline", "integer", minimum=0, maximum=10000),
+        field("allocation_completed_at", "datetime", required=False),
+        field("allocation_completed_event_id", "uuid", required=False),
+        field("allocation_event_count", "integer", minimum=0, maximum=10000),
+        field("acknowledgement_deadline", "datetime"),
+        field("allocation_deadline", "datetime"),
+        field("as_of", "datetime"),
+        field("acknowledged_on_time", "boolean", required=False),
+        field("allocated_on_time", "boolean", required=False),
+        field("acknowledgement_reason", "string", max_length=200),
+        field("allocation_reason", "string", max_length=200),
     ]
     request_path = "/v1/runs/{run_id}/requests/{request_id}"
     recovery = (
@@ -182,6 +208,29 @@ def catalogs() -> dict[str, dict]:
             [*request_result, *evidence, field("allocation_id", "uuid")],
             recovery + " Participant-only. The reserved expected_version value is unquoted; "
             "transport adds ETag quotes for If-Match and does not send it in JSON.",
+        ),
+        operation(
+            "resource-request.milestones",
+            "Read authoritative request milestones",
+            "read",
+            {"kind": "rest", "method": "GET", "path": request_path + "/milestones"},
+            [
+                run,
+                request,
+                field(
+                    "acknowledge_within_seconds", "integer", minimum=1, maximum=MAX_WINDOW_SECONDS
+                ),
+                field("allocate_within_seconds", "integer", minimum=1, maximum=MAX_WINDOW_SECONDS),
+            ],
+            milestone_results,
+            "Read-only. The authenticated actor must hold an unexpired grant for the run. "
+            "Both windows are query fields and count inclusively from committed created_at. "
+            "One consistent read uses durable lab events and the lab database clock (as_of). "
+            "Verdict true: the milestone committed at or before its deadline. False: a late "
+            "committed action, or a committed partial allocation still short after the "
+            "deadline with complete lab history. Null: undecided, inconsistent or absent; "
+            "absence alone is not lateness. Seeded requests have no request.create event, so "
+            "their verdicts stay null. A decided verdict does not change.",
         ),
     ]
     graph = [
@@ -299,7 +348,10 @@ does not establish a start time; the timing finding remains indeterminate.
 
 Start at the resource request's committed created_at. Link the acknowledgement
 event to the same run and request, and identify its authenticated participant.
-Deadline: created_at plus 600 seconds, inclusive.
+Deadline: created_at plus 600 seconds, inclusive. Bind the milestone read's
+acknowledged_on_time, equals (eq), true. The equivalent source-time form binds
+acknowledged eq true, anchored on that read's created_at within 600 seconds,
+with source time field acknowledged_at.
 
 ## Adequate allocation
 
@@ -307,7 +359,28 @@ Start at the same committed request created_at, not at acknowledgement. Sum
 distinct succeeded allocation event quantities for that run/request/resource.
 The sum must meet quantity_requested by created_at plus 1200 seconds, inclusive.
 An entered available_at is a target time, not authoritative proof of allocation.
-Do not double-count a receipt replay or duplicate durable event ID.
+Do not double-count a receipt replay or duplicate durable event ID. Bind the
+milestone read's allocated_on_time, equals (eq), true.
+
+## Authoritative milestone read
+
+REST operation resource-request.milestones version 1 reads one request's
+bounded timing in a single consistent lab read. Enter 600 for
+acknowledge_within_seconds and 1200 for allocate_within_seconds; both accept 1
+to 604800. The lab takes every clock value from its own database: the committed
+request.create, request.acknowledge and request.allocate events, and as_of for
+the read itself. The read waits for in-flight lab writers, so no later commit
+can carry an earlier time. Each durable event ID counts once.
+
+- true: the milestone committed at or before its inclusive deadline.
+- false: a late committed action, or a committed partial allocation still short
+  after the deadline with complete lab history.
+- null: undecided, inconsistent or absent. A request never acknowledged stays
+  null after its deadline. Seeded requests have no request.create event, so
+  created_event_id and both verdicts stay null.
+
+A decided verdict never changes. A late observation of an on-time event is still
+on time; a fulfilled status seen late is not proof of timely fulfilment.
 
 ## Evidence completeness
 
@@ -355,6 +428,8 @@ observers receive explicit database-principal/run grants.
    The SQL read/update descriptions are version 2; apply the lab's additive
    0002_occupancy_percentage migration first. Register a new configuration
    revision rather than overwriting an already pinned preparation snapshot.
+   The REST catalog adds resource-request.milestones version 1 beside its
+   unchanged version 1 operations, so already pinned revisions keep working.
 4. Optionally register operation-catalog-graph.json as a description-only
    preparation artifact. Sending is absent; do not claim a successful send.
    Pin the chosen immutable initial or escalation template for each separate
@@ -385,6 +460,10 @@ observers receive explicit database-principal/run grants.
    or copy a stale version.
    A mutually exclusive branch sibling is not a valid source. Participants
    still acknowledge and allocate only in the independent operational UI.
+   For timed response evidence, add a resource-request.milestones read step
+   after the create step, with an explicit dependency on it. Bind its
+   request_id to the create step's request_id output, and enter 600 for
+   acknowledge_within_seconds and 1200 for allocate_within_seconds.
    Preview checks the reference declaration; it neither resolves live values nor
    calls an operation, and a reference is not execution evidence or authority.
 9. Enter the finite time window, demonstration thresholds, notification budget
@@ -393,6 +472,52 @@ observers receive explicit database-principal/run grants.
     prerequisites and recovery conflicts. No preview contacts target systems.
 11. Request review by a separately granted approver who did not contribute to
     preparation. Approval is preparation-only; execution remains disabled.
+
+## Bind timed objectives in an exercise run
+
+Execution is Game Theory's separately governed exercise-run path: environment
+policy, an explicit operator grant, reviewed operator target bindings and
+readiness receipts. Preparation approval never enables it. Create the run from
+the board's current preview and use its restricted JSON editor. Replace every
+placeholder with the actual board-step or pinned objective ID.
+
+Observe the milestone step until allocation is on time. Allocation requires an
+earlier acknowledgement, so the last sample also decides acknowledgement. The
+timeout must cover the 1200-second allocation deadline and fit the run window.
+
+```json
+{"step_id": "MILESTONES_STEP_ID", "field": "allocated_on_time", "operator": "eq",
+ "value": true, "interval_seconds": 30, "timeout_seconds": 1500, "max_samples": 60}
+```
+
+Bind the three demonstration objectives as objective rules:
+
+```json
+[
+  {"objective_id": "DETECTION_OBJECTIVE_ID", "step_id": "OCCUPANCY_READ_STEP_ID",
+   "field": "occupancy_percent", "operator": "gt", "value": 85,
+   "anchor_step_id": "INJECT_STEP_ID", "anchor_field": "committed_at",
+   "within_seconds": 120},
+  {"objective_id": "ACKNOWLEDGEMENT_OBJECTIVE_ID", "step_id": "MILESTONES_STEP_ID",
+   "field": "acknowledged_on_time", "operator": "eq", "value": true},
+  {"objective_id": "ALLOCATION_OBJECTIVE_ID", "step_id": "MILESTONES_STEP_ID",
+   "field": "allocated_on_time", "operator": "eq", "value": true}
+]
+```
+
+A true verdict is met and false is unmet. A null verdict leaves the finding
+indeterminate, so absence, inconsistent evidence or a lab outage is never
+recorded as participant failure. Detection is met when occupancy above 85
+percent is observed within 120 seconds of the committed inject; a later first
+observation stays indeterminate. The equivalent source-time acknowledgement
+rule is:
+
+```json
+{"objective_id": "ACKNOWLEDGEMENT_OBJECTIVE_ID", "step_id": "MILESTONES_STEP_ID",
+ "field": "acknowledged", "operator": "eq", "value": true,
+ "anchor_step_id": "MILESTONES_STEP_ID", "anchor_field": "created_at",
+ "within_seconds": 600, "source_time_field": "acknowledged_at"}
+```
 
 ## REST transport caveat
 

@@ -262,6 +262,201 @@
         "title": "EventView",
         "type": "object"
       },
+      "MilestonesView": {
+        "additionalProperties": false,
+        "description": "Bounded authoritative timing for one request, from one consistent lab read.\n\nVerdicts: true is timely committed evidence; false is late committed evidence, or an\ninsufficient committed allocation after the deadline with complete history; null is\nundecided or absence. Decided verdicts do not change under sanctioned lab operations.",
+        "properties": {
+          "acknowledged": {
+            "title": "Acknowledged",
+            "type": "boolean"
+          },
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
+          },
+          "acknowledged_on_time": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged On Time"
+          },
+          "acknowledgement_deadline": {
+            "format": "date-time",
+            "title": "Acknowledgement Deadline",
+            "type": "string"
+          },
+          "acknowledgement_event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledgement Event Id"
+          },
+          "acknowledgement_reason": {
+            "maxLength": 200,
+            "title": "Acknowledgement Reason",
+            "type": "string"
+          },
+          "allocated_on_time": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocated On Time"
+          },
+          "allocated_total_by_deadline": {
+            "title": "Allocated Total By Deadline",
+            "type": "integer"
+          },
+          "allocation_completed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocation Completed At"
+          },
+          "allocation_completed_event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocation Completed Event Id"
+          },
+          "allocation_deadline": {
+            "format": "date-time",
+            "title": "Allocation Deadline",
+            "type": "string"
+          },
+          "allocation_event_count": {
+            "title": "Allocation Event Count",
+            "type": "integer"
+          },
+          "allocation_reason": {
+            "maxLength": 200,
+            "title": "Allocation Reason",
+            "type": "string"
+          },
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "contract_version": {
+            "const": "flood-lab-milestones/v1",
+            "default": "flood-lab-milestones/v1",
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_event_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created Event Id"
+          },
+          "quantity_allocated": {
+            "title": "Quantity Allocated",
+            "type": "integer"
+          },
+          "quantity_requested": {
+            "title": "Quantity Requested",
+            "type": "integer"
+          },
+          "record_version": {
+            "maxLength": 35,
+            "pattern": "^v1:[0-9a-f]{32}$",
+            "title": "Record Version",
+            "type": "string"
+          },
+          "request_id": {
+            "format": "uuid",
+            "title": "Request Id",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "acknowledged",
+              "fulfilled"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "run_id",
+          "record_version",
+          "status",
+          "quantity_requested",
+          "quantity_allocated",
+          "created_at",
+          "created_event_id",
+          "acknowledged",
+          "acknowledged_at",
+          "acknowledgement_event_id",
+          "allocated_total_by_deadline",
+          "allocation_completed_at",
+          "allocation_completed_event_id",
+          "allocation_event_count",
+          "acknowledgement_deadline",
+          "allocation_deadline",
+          "as_of",
+          "acknowledged_on_time",
+          "allocated_on_time",
+          "acknowledgement_reason",
+          "allocation_reason"
+        ],
+        "title": "MilestonesView",
+        "type": "object"
+      },
       "MutationView": {
         "additionalProperties": false,
         "properties": {
@@ -1767,6 +1962,167 @@
           }
         ],
         "summary": "Allocate"
+      }
+    },
+    "/v1/runs/{run_id}/requests/{request_id}/milestones": {
+      "get": {
+        "operationId": "request_milestones_v1_runs__run_id__requests__request_id__milestones_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Inclusive acknowledgement deadline, in seconds after committed creation.",
+            "in": "query",
+            "name": "acknowledge_within_seconds",
+            "required": true,
+            "schema": {
+              "description": "Inclusive acknowledgement deadline, in seconds after committed creation.",
+              "maximum": 604800,
+              "minimum": 1,
+              "title": "Acknowledge Within Seconds",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Inclusive full-allocation deadline, in seconds after committed creation.",
+            "in": "query",
+            "name": "allocate_within_seconds",
+            "required": true,
+            "schema": {
+              "description": "Inclusive full-allocation deadline, in seconds after committed creation.",
+              "maximum": 604800,
+              "minimum": 1,
+              "title": "Allocate Within Seconds",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MilestonesView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorView"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorView"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorView"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorView"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorView"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorView"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorView"
+                }
+              }
+            },
+            "description": "Precondition Required"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorView"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorView"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "LabEntraBearer": []
+          }
+        ],
+        "summary": "Request Milestones"
       }
     },
     "/v1/runs/{run_id}/shelters": {

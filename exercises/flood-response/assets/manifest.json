@@ -1,110 +1,110 @@
 {
   "schema_version": "flood-lab-assets/v1",
-  "asset_version": "1.1.0",
+  "asset_version": "1.2.0",
   "profile_version": "demonstration/v1",
   "synthetic": true,
   "files": [
     {
       "path": "flood-lab.openapi.json",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "application/json",
-      "size_bytes": 50036,
-      "sha256": "26bf58a4f8d8f45c39598f1315200ad573dd0e8980deba9d40941610b1389410"
+      "size_bytes": 60344,
+      "sha256": "b5327c1714126579dd68c8a9744dc427ae58c8f7e1fdd555adedc78a5612c1aa"
     },
     {
       "path": "inject-schedule.csv",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "text/csv",
       "size_bytes": 190,
       "sha256": "4bd3271f69cd0d8929374dcb919fad7037c934e86c865d0e59131e2ddebe325c"
     },
     {
       "path": "notification-escalation.txt",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "text/plain",
       "size_bytes": 598,
       "sha256": "ed31fadba99a2b328bd497d8d3ca0358d879ed0a1c369c8a9a17e6a314997127"
     },
     {
       "path": "notification-initial.txt",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "text/plain",
       "size_bytes": 592,
       "sha256": "5a7597f2781321e975ac326e1d9b348c19a0f898c5fca45905da7d46a31bc028"
     },
     {
       "path": "objectives-and-evidence.md",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "text/markdown",
-      "size_bytes": 2314,
-      "sha256": "1c8e173ce3d2a2d7510573c9526614ab45ef33a2f902e731dab9293de774f343"
+      "size_bytes": 3702,
+      "sha256": "7a0190025136185e2d293bd422155824dfb5f98834bb685c27452ab0623e6b98"
     },
     {
       "path": "operation-catalog-graph.json",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "application/json",
       "size_bytes": 2200,
       "sha256": "344f6fd60373080b312c2ee326c50cf13eb51601b9e152569ff78c9737511cbf"
     },
     {
       "path": "operation-catalog-rest.json",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "application/json",
-      "size_bytes": 11612,
-      "sha256": "0db11e80781892c01ec97948e2cda4befa34d85c648e7b2cbcb1d5f1eea32d97"
+      "size_bytes": 16301,
+      "sha256": "2704a0c137bd79abab798d56701d02d73ab93c62082ce6637599a5d34d43a7a1"
     },
     {
       "path": "operation-catalog-sql.json",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "application/json",
       "size_bytes": 4806,
       "sha256": "34982f8fdff5cd0c64e9028a7278f83a08035f88a2437a560720afee1ff136f2"
     },
     {
       "path": "operator-and-ui-setup.md",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "text/markdown",
-      "size_bytes": 7042,
-      "sha256": "c9c710dea9aed02c3f66a5fc16f10cf903d8662043bec2c9ec401eed6ba74310"
+      "size_bytes": 9611,
+      "sha256": "16587a47d8f63844d1912637ed82eb37b066a21b6c34117514838b81f7a9bae7"
     },
     {
       "path": "personnel.json",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "application/json",
       "size_bytes": 412,
       "sha256": "aac893da76b6b0869538f73ea7eccf2c3d88bd5bc9eaacb6469f53a51d37c90f"
     },
     {
       "path": "profile.json",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "application/json",
       "size_bytes": 696,
       "sha256": "71af7302e9eca70780c26864dd1c3c79d87c018d6ca0b921a37aeed16aadeddc"
     },
     {
       "path": "request-samples.json",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "application/json",
       "size_bytes": 460,
       "sha256": "66b384aec772aad32f4c4c3259efbd3bf3dc5bba496941fc7dddf9b7c2d9d62b"
     },
     {
       "path": "seed-manifest-example.json",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "application/json",
       "size_bytes": 1850,
       "sha256": "55c5e8924f0546ba5ecd56ca4b1d73676ba29b57e6d72beaa723454b014f9e28"
     },
     {
       "path": "shelters.json",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "application/json",
       "size_bytes": 416,
       "sha256": "deed86eab4aebc9a85b46bdb28c03795d8b539ad6a3c4b36fda3863c45ff04df"
     },
     {
       "path": "situation-brief.md",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "media_type": "text/markdown",
       "size_bytes": 3506,
       "sha256": "8c7696956cbf3bcf627f1f4336cd8551ec63adb7f95d79a72c0ecbc276218553"

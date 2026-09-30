@@ -28,6 +28,8 @@ observers receive explicit database-principal/run grants.
    The SQL read/update descriptions are version 2; apply the lab's additive
    0002_occupancy_percentage migration first. Register a new configuration
    revision rather than overwriting an already pinned preparation snapshot.
+   The REST catalog adds resource-request.milestones version 1 beside its
+   unchanged version 1 operations, so already pinned revisions keep working.
 4. Optionally register operation-catalog-graph.json as a description-only
    preparation artifact. Sending is absent; do not claim a successful send.
    Pin the chosen immutable initial or escalation template for each separate
@@ -58,6 +60,10 @@ observers receive explicit database-principal/run grants.
    or copy a stale version.
    A mutually exclusive branch sibling is not a valid source. Participants
    still acknowledge and allocate only in the independent operational UI.
+   For timed response evidence, add a resource-request.milestones read step
+   after the create step, with an explicit dependency on it. Bind its
+   request_id to the create step's request_id output, and enter 600 for
+   acknowledge_within_seconds and 1200 for allocate_within_seconds.
    Preview checks the reference declaration; it neither resolves live values nor
    calls an operation, and a reference is not execution evidence or authority.
 9. Enter the finite time window, demonstration thresholds, notification budget
@@ -66,6 +72,52 @@ observers receive explicit database-principal/run grants.
     prerequisites and recovery conflicts. No preview contacts target systems.
 11. Request review by a separately granted approver who did not contribute to
     preparation. Approval is preparation-only; execution remains disabled.
+
+## Bind timed objectives in an exercise run
+
+Execution is Game Theory's separately governed exercise-run path: environment
+policy, an explicit operator grant, reviewed operator target bindings and
+readiness receipts. Preparation approval never enables it. Create the run from
+the board's current preview and use its restricted JSON editor. Replace every
+placeholder with the actual board-step or pinned objective ID.
+
+Observe the milestone step until allocation is on time. Allocation requires an
+earlier acknowledgement, so the last sample also decides acknowledgement. The
+timeout must cover the 1200-second allocation deadline and fit the run window.
+
+```json
+{"step_id": "MILESTONES_STEP_ID", "field": "allocated_on_time", "operator": "eq",
+ "value": true, "interval_seconds": 30, "timeout_seconds": 1500, "max_samples": 60}
+```
+
+Bind the three demonstration objectives as objective rules:
+
+```json
+[
+  {"objective_id": "DETECTION_OBJECTIVE_ID", "step_id": "OCCUPANCY_READ_STEP_ID",
+   "field": "occupancy_percent", "operator": "gt", "value": 85,
+   "anchor_step_id": "INJECT_STEP_ID", "anchor_field": "committed_at",
+   "within_seconds": 120},
+  {"objective_id": "ACKNOWLEDGEMENT_OBJECTIVE_ID", "step_id": "MILESTONES_STEP_ID",
+   "field": "acknowledged_on_time", "operator": "eq", "value": true},
+  {"objective_id": "ALLOCATION_OBJECTIVE_ID", "step_id": "MILESTONES_STEP_ID",
+   "field": "allocated_on_time", "operator": "eq", "value": true}
+]
+```
+
+A true verdict is met and false is unmet. A null verdict leaves the finding
+indeterminate, so absence, inconsistent evidence or a lab outage is never
+recorded as participant failure. Detection is met when occupancy above 85
+percent is observed within 120 seconds of the committed inject; a later first
+observation stays indeterminate. The equivalent source-time acknowledgement
+rule is:
+
+```json
+{"objective_id": "ACKNOWLEDGEMENT_OBJECTIVE_ID", "step_id": "MILESTONES_STEP_ID",
+ "field": "acknowledged", "operator": "eq", "value": true,
+ "anchor_step_id": "MILESTONES_STEP_ID", "anchor_field": "created_at",
+ "within_seconds": 600, "source_time_field": "acknowledged_at"}
+```
 
 ## REST transport caveat
 

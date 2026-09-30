@@ -193,6 +193,53 @@ Point observations do not prove complete historical coverage: absent evidence,
 missing clocks, and a late observation without an authoritative late source event
 remain indeterminate. Unbound free-text objectives are not interpreted by a model.
 
+### Authoritative milestone evidence
+
+Timed objectives are only as strong as the clocks behind them: a completed record
+seen later proves only that it was complete by that observation. A target that
+can prove timing exposes bounded milestones as ordinary declared scalar results.
+The independent lab's `resource-request.milestones@1` read is the reference
+example. No manifest, observation, or objective-rule field changed for this, so
+historic runs keep their digests.
+
+- **Event identity.** A milestone is one durable target event, identified by the
+  target's own event ID and committed timestamp, such as
+  `acknowledgement_event_id` and `acknowledged_at`. Game Theory never invents an
+  event ID or substitutes a read time for a missing one.
+- **Deduplication.** Every successful sample of an observed read is stored as
+  both `operation.succeeded` and `observation`, and repeated polls can see the
+  same source event many times. Findings compare values, so repeated samples of
+  one source event cannot change a finding. A target that aggregates must count
+  each durable event ID once; the lab sums distinct allocation events and ignores
+  receipt replays.
+- **Observation time versus authoritative source time.** Observation time is
+  when the executor recorded a sample. Authoritative source time is a declared
+  datetime result set by the target's commit clock and named by
+  `source_time_field`. A late observation of an on-time source event is met. A
+  source time before the anchor or after its own observation is inconsistent and
+  indeterminate.
+- **Coverage.** Point observations do not prove what happened between samples.
+  Without a source time, an observation after the deadline stays indeterminate.
+  A target verdict can decide more only when the target proves coverage from its
+  own complete history, as the lab does once its `as_of` is after the deadline
+  and every allocation record pairs with a durable event.
+- **Lateness.** A finding is unmet only from committed evidence: a satisfied
+  predicate whose authoritative source time is after the deadline, or a target
+  verdict of `false` compared with `eq true`. Absence, outages, and missing or
+  null optional values stay indeterminate.
+- **Clock consistency.** Anchor and source times must come from one target clock.
+  The lab assigns every value from its database clock under its run lock, and its
+  milestone read shares that lock before reading `as_of`. No later commit can
+  then carry an earlier time, so decided verdicts do not change. A backwards step
+  of the database clock is outside this guarantee; evidence later than `as_of` is
+  reported as inconsistent (null).
+
+Bind a target verdict directly, for example `acknowledged_on_time` `eq` `true`
+with no anchor. Alternatively use the timestamp form: `acknowledged` `eq` `true`,
+anchored on the read's `created_at` with `within_seconds`, and
+`source_time_field` `acknowledged_at`. A paged event-history adapter for targets
+that cannot compute bounded milestones remains future work (F4).
+
 Persisted attempts distinguish succeeded, rejected, failed, and unknown. A lost
 result after commit keeps the original identity, payload, and key; safe replay
 recovers the target receipt rather than intentionally issuing another mutation.
@@ -262,6 +309,9 @@ The Linux `execution` CI job separately provisions disposable
 `gametheory_test_execution` and `flood_lab_test_execution` databases, starts the
 independent lab as a separate process with TLS, exercises actual SQL/REST effects
 and post-commit reconciliation, and restarts the durable executor during a wait.
+It also assesses timed objectives from the lab's milestone read with short TEST
+ONLY windows (on-time, late, absent, and partial responses), a strict occupancy
+threshold, and a lab outage that holds the run for intervention.
 Its token exchange and readiness attestations are explicitly test fixtures.
 
 No SQLite substitute, token bypass in product code, shared application/lab
