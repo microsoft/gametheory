@@ -25,6 +25,15 @@ param deployApplications bool = false
 param apiImage string = ''
 param workerImage string = ''
 param enablePlanning bool = false
+@description('Run-check assistant on the API and planning worker. Applied only when enablePlanning is true.')
+param enableRunAssistant bool = false
+@description('Planner output token limit. Reasoning models count reasoning tokens against it.')
+@minValue(256)
+@maxValue(16000)
+param plannerMaxOutputTokens int = 6000
+@minValue(10)
+@maxValue(600)
+param modelTimeoutSeconds int = 120
 param foundryProjectEndpoint string = ''
 param modelDeployment string = ''
 @description('Provision a dedicated private Foundry project and regional model rather than use an existing project.')
@@ -37,6 +46,8 @@ var suffix = uniqueString(resourceGroup().id)
 var stem = '${namePrefix}-${suffix}'
 var databaseName = 'gametheory'
 var taskHubName = 'planning'
+// The application refuses to start with the assistant on and planning off.
+var runAssistantEnabled = enablePlanning && enableRunAssistant
 
 resource apiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: 'id-${stem}-api'
@@ -222,6 +233,7 @@ var commonSettings = [
   { name: 'GT_API_AUDIENCE', value: apiAudience }
   { name: 'GT_API_SCOPE', value: apiScope }
   { name: 'GT_PLANNING_ENABLED', value: string(enablePlanning) }
+  { name: 'GT_RUN_ASSISTANT_ENABLED', value: string(runAssistantEnabled) }
   { name: 'GT_SCHEDULER_ENDPOINT', value: scheduler.properties.endpoint }
   { name: 'GT_SCHEDULER_TASKHUB', value: taskHubName }
   { name: 'GT_FOUNDRY_PROJECT_ENDPOINT', value: deployFoundry ? foundry!.outputs.projectEndpoint : foundryProjectEndpoint }
@@ -278,6 +290,8 @@ resource worker 'Microsoft.App/containerApps@2024-03-01' = if (deployApplication
         env: concat(commonSettings, [
           { name: 'AZURE_CLIENT_ID', value: workerIdentity.properties.clientId }
           { name: 'GT_SQL_URL', value: '${sqlUrlBase}&UID=${workerIdentity.properties.clientId}' }
+          { name: 'GT_PLANNER_MAX_OUTPUT_TOKENS', value: string(plannerMaxOutputTokens) }
+          { name: 'GT_MODEL_TIMEOUT_SECONDS', value: string(modelTimeoutSeconds) }
         ])
       }]
     }
@@ -300,4 +314,5 @@ output containerEnvironmentId string = computeNetwork.outputs.containerEnvironme
 output virtualNetworkId string = computeNetwork.outputs.virtualNetworkId
 output plannedWebName string = 'web-${stem}'
 output foundryEndpoint string = deployFoundry ? foundry!.outputs.projectEndpoint : foundryProjectEndpoint
+output runAssistantEnabled bool = runAssistantEnabled
 output webUrl string = deployApplications ? 'https://${web!.properties.defaultHostName}' : ''
