@@ -268,14 +268,30 @@ The bindings mount has these trade-offs:
   readiness receipt for its new digest, which only the separate SQL operator principal
   can insert.
 
-After enabling execution, confirm from the API and from the executor that
-`/mnt/execution-bindings/bindings.json` is readable and that the account's file
-endpoint resolves to its private address. The template sets no `outboundVnetRouting`:
-Microsoft Learn asks for content-share routing only for Azure Functions content shares
-and Windows code apps, and its guide to Linux container storage mounts lists no
-routing setting for private endpoints. The template adds no NSG; one added later must
-allow the Azure Files mount ports (445, and 80 for App Service) from the web and
-workers subnets.
+The share has no public endpoint, so both mounts reach it through the virtual network.
+The executor's Container Apps environment already runs in it. For the API,
+`enableExecution` also sets `vnetContentShareEnabled` (named
+`outboundVnetRouting.contentShareTraffic` in newer API versions), which routes only
+App Service's storage-mount traffic through VNet integration. Microsoft Learn's Linux
+container storage-mount guide lists no such setting, but it treats platform traffic
+during startup as configuration traffic that takes the public route unless routed,
+and a mount over the public route would fail. Application traffic keeps its current
+route, so the API's calls to public services are unaffected; the template does not
+route all traffic. The template adds no NSG; one added later must allow the Azure
+Files mount ports (445, and 80 for App Service) from the web and workers subnets.
+
+Both images run as the non-root user `app` (uid 10001). The executor mounts the share
+with `dir_mode=0555,file_mode=0444`, so that user can read the file whatever the
+platform's default SMB modes are. App Service offers no mount options, so the API
+relies on its default mount permissions. After enabling execution, check both:
+
+- Executor: open a shell with
+  `az containerapp exec --resource-group RESOURCE_GROUP --name EXECUTOR_APP --command sh`,
+  using the `executorAppName` output. `cat /mnt/execution-bindings/bindings.json` must
+  print the reviewed file, and `getent hosts BINDINGS_STORAGE_ACCOUNT.file.core.windows.net`
+  must return a private address.
+- API: the studio's run pre-check reads the file as `app` and reports a
+  `bindings_unavailable` blocker if the API cannot read or parse it.
 
 Setting `enableExecution=false` later removes the API's execution settings, which
 blocks new authorizations, starts, resumes, and reconciliation. An executor that is

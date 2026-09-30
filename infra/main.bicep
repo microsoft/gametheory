@@ -337,6 +337,9 @@ resource web 'Microsoft.Web/sites@2023-12-01' = if (deployApplications) {
     serverFarmId: plan.id
     httpsOnly: true
     virtualNetworkSubnetId: webSubnet
+    // The bindings share has no public endpoint. This routes only the platform's storage-mount
+    // traffic through VNet integration; application traffic, including public services, is unchanged.
+    ...(executionOn ? { vnetContentShareEnabled: true } : {})
     siteConfig: {
       linuxFxVersion: 'DOCKER|${apiImage}'
       acrUseManagedIdentityCreds: true
@@ -432,7 +435,13 @@ resource executor 'Microsoft.App/containerApps@2024-03-01' = if (executionOn) {
     }
     template: {
       scale: { minReplicas: 1, maxReplicas: 1 }
-      volumes: [{ name: 'execution-bindings', storageType: 'AzureFile', storageName: bindingsEnvironmentStorage.name }]
+      volumes: [{
+        name: 'execution-bindings'
+        storageType: 'AzureFile'
+        storageName: bindingsEnvironmentStorage.name
+        // Readable by the image's non-root user (uid 10001) whatever the platform's default SMB modes are.
+        mountOptions: 'dir_mode=0555,file_mode=0444'
+      }]
       containers: [{
         name: 'executor'
         image: executorImage
@@ -479,3 +488,4 @@ output bindingsStorageAccount string = deployExecutor ? bindingsAccount.name : '
 output bindingsShare string = deployExecutor ? bindingsFileShare.name : ''
 output bindingsFile string = deployExecutor ? bindingsFile : ''
 output executionEnabled bool = executionOn
+output executorAppName string = executionOn ? executor.name : ''
