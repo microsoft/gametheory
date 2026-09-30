@@ -1,7 +1,8 @@
 # Flood response pilot: product and exercise-environment handoff
 
 Status: **Application execution development selected; not deployment or live
-execution authorization.**
+execution authorization.** Current progress, item IDs, and the phased plan are
+tracked in [roadmap.md](roadmap.md).
 
 Continuation update: the preparation/lab implementation and Linux dependency/
 SQL fixes are merged in #9. The next application increment adds administrator
@@ -13,8 +14,8 @@ new executable-v2 path, not for historical preparation records. The descriptions
 below record the original pilot context; [execution.md](execution.md) is the
 current implemented contract and its limitations.
 
-Roadmap N3, closing the timed-response evidence gap, is implemented and awaits
-review. The lab adds the versioned `resource-request.milestones@1` read, which
+Roadmap N3, closing the timed-response evidence gap, is merged in #16. The lab
+adds the versioned `resource-request.milestones@1` read, which
 returns authoritative acknowledgement and allocation timing from its durable
 events and database clock. The unchanged v2 executor assesses the three
 demonstration objectives as met, unmet, or indeterminate without inferring
