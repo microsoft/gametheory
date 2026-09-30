@@ -16,11 +16,15 @@ Government/custom runtime deployment is deferred.
   disabled, App Service, a Container Apps environment, and Log Analytics.
 - Application deployments gated by `deployApplications`; planning workers additionally
   require `enablePlanning`.
+- An optional exercise executor, off by default: `deployExecutor` provisions its
+  identity, task hub, and private bindings share, and `enableExecution` starts it. See
+  the [opt-in executor rollout](#opt-in-executor-rollout).
 
 The first template deployment should set `deployApplications=false`. It creates
 infrastructure/identities but does not start an unconfigured application. Supply
 reviewed container images by immutable digest for the subsequent application
-deployment. The API and worker images must be pushed to the created registry.
+deployment. The API and worker images, and the executor image when it is deployed,
+must be pushed to the created registry.
 
 The template is a greenfield starting point, not an agency network landing zone.
 Review its address ranges, SKUs, retention, egress, registry exposure, regional
@@ -77,6 +81,8 @@ because concurrent changes to a Cognitive Services account can conflict.
    ```bash
    docker build --target api -t YOUR_REGISTRY/gametheory-api:YOUR_TAG .
    docker build --target worker -t YOUR_REGISTRY/gametheory-worker:YOUR_TAG .
+   # Only when deploying the executor:
+   docker build --target executor -t YOUR_REGISTRY/gametheory-executor:YOUR_TAG .
    ```
 
    Record the resulting digests for deployment. CI builds but never pushes images.
@@ -97,8 +103,10 @@ because concurrent changes to a Cognitive Services account can conflict.
    gametheory database-grants --api-client-id API_CLIENT_UUID --worker-client-id WORKER_CLIENT_UUID
    ```
 
-   It refuses identity mismatches. It adds table grants, not database-owner roles,
-   and does not revoke pre-existing grants; audit existing database users separately.
+   With the optional executor, add `--executor-client-id EXECUTOR_CLIENT_UUID`, using
+   the `executorIdentityClientId` output. It refuses identity mismatches. It adds table
+   grants, not database-owner roles, and does not revoke pre-existing grants; audit
+   existing database users separately.
 
 7. Bootstrap the first organization administrator explicitly.
 8. Grant the worker appropriate native Foundry project/model access. The template
@@ -117,9 +125,11 @@ because concurrent changes to a Cognitive Services account can conflict.
    SQL, identity, network, and model checks pass.
 
 The application contains no runtime secrets that require Key Vault in this milestone:
-cloud services use identities and connection inventory contains no credentials.
-Introduce secret references and vault policies when actual integrations are activated,
-not a placeholder vault with unnecessary grants.
+cloud services use identities and connection inventory contains no credentials. The
+optional executor adds one platform-held secret: App Service and Container Apps keep
+the bindings share's storage account key in their own configuration to mount it, and
+the application never reads it. Introduce secret references and vault policies when
+actual integrations are activated, not a placeholder vault with unnecessary grants.
 
 ## Live acceptance
 
@@ -191,17 +201,89 @@ application database or alter private-network policy to make a preview pass.
 
 Application migrations `0003` and `0004` add versioned environment policies and
 isolated run/authorization/evidence/outbox records. Apply them with the migration
-operator, then review the updated table-scoped API grants and optional separate
-executor principal. The planning worker retains its existing privileges and
-`plan_v1` histories.
+operator, then review the updated table-scoped API grants. The planning worker
+retains its existing privileges and `plan_v1` histories.
 
-The `executor` Docker target starts `gametheory-executor`. It is not deployed by
-the existing greenfield template. An approved deployment must explicitly provide
-its own task hub, task-hub-scoped Scheduler grant, application SQL identity,
-allowlisted target identities, read-only target binding file, and network access.
-The API must receive the matching non-secret binding/runtime settings, but no
-external target identity grants. Record operator readiness receipts only after
-actual identity, connectivity, permission, and isolation checks.
+The `executor` Docker target starts `gametheory-executor`, which exits unless
+execution is enabled. `infra/main.bicep` adds it in two stages, both off by default:
+
+- `deployExecutor=true` provisions prerequisites only; nothing runs. It creates the
+  executor identity with registry pull, an `exercises` task hub whose Durable Task
+  Data Contributor grant goes to that identity only, and a dedicated storage account
+  for the `execution-bindings` file share, reachable only through a private endpoint
+  in the private subnet.
+- `enableExecution=true` takes effect only with `deployApplications=true` and
+  `deployExecutor=true`; the `executionEnabled` output reports the applied value. It
+  starts the executor Container App (one replica, no ingress) and adds
+  `GT_EXECUTION_ENABLED`, `GT_EXECUTION_TASKHUB`, and `GT_EXECUTION_BINDINGS_FILE` to
+  the API. Both mount the share at `/mnt/execution-bindings`. The executor receives
+  only cloud, tenant, SQL, Scheduler, and execution settings, with `AZURE_CLIENT_ID`
+  pinned to its own identity; no planning, Foundry, or model setting reaches it.
+  While execution is off, the API's settings and mounts are unchanged.
+
+Provisioning, identity attachment, task-hub grants, networking, and rollout require a
+separate, concrete deployment approval; earlier Game Theory deployment approval does
+not cover them. Roll out in stages:
+
+1. Obtain that approval, then deploy with `deployExecutor=true`.
+2. Apply migrations through `0005`, then rerun `gametheory database-grants` with
+   `--executor-client-id` set to the `executorIdentityClientId` output. Readiness
+   insertion and DDL remain operator-only.
+3. Publish the reviewed bindings JSON from the private network with Entra
+   authorization, using the `bindingsStorageAccount` output:
+
+   ```bash
+   az storage file upload --auth-mode login --enable-file-backup-request-intent \
+     --account-name BINDINGS_STORAGE_ACCOUNT --share-name execution-bindings \
+     --source REVIEWED_BINDINGS_FILE --path bindings.json
+   ```
+
+   The publishing operator needs Storage File Data Privileged Contributor on the
+   account, granted separately; the template grants no data-plane role. Never
+   distribute the account key.
+
+4. Separately approve each exercise target identity, then pass its resource ID in
+   `executorTargetIdentityIds`. The deployer needs
+   `Microsoft.ManagedIdentity/userAssignedIdentities/assign/action` on each one (for
+   example, through Managed Identity Operator). Target identities are attached to the
+   executor only, never to the API or the planning worker.
+5. Build and push the executor image, then deploy with `enableExecution=true` and
+   `executorImage` set by digest.
+6. An administrator classifies environments, and the operator records
+   [readiness receipts](execution.md#operator-target-binding-and-readiness) (A13)
+   after actual identity, connectivity, permission, and isolation checks, before any
+   run.
+
+The bindings mount has these trade-offs:
+
+- App Service and Container Apps mount Azure Files only with the storage account key,
+  so the bindings account allows shared-key access. The policy exemption must cover
+  this account only; SQL, Blob, and Scheduler access stay identity-based.
+- The key is held in the App Service configuration and the Container Apps environment
+  storage, never in template outputs. The template reads the account's first key.
+  Rotation means regenerating that key, redeploying, and restarting the executor
+  revision; runs are blocked in between.
+- App Service cannot mount Azure Files read-only, so the API's mount is read-write at
+  the platform level. The executor's mount is read-only, and a changed binding needs a
+  readiness receipt for its new digest, which only the separate SQL operator principal
+  can insert.
+
+After enabling execution, confirm from the API and from the executor that
+`/mnt/execution-bindings/bindings.json` is readable and that the account's file
+endpoint resolves to its private address. The template sets no `outboundVnetRouting`:
+Microsoft Learn asks for content-share routing only for Azure Functions content shares
+and Windows code apps, and its guide to Linux container storage mounts lists no
+routing setting for private endpoints. The template adds no NSG; one added later must
+allow the Azure Files mount ports (445, and 80 for App Service) from the web and
+workers subnets.
+
+Setting `enableExecution=false` later removes the API's execution settings, which
+blocks new authorizations, starts, resumes, and reconciliation. An executor that is
+still running keeps advancing runs already in progress, and incremental deployments
+do not delete what the template no longer declares. Pause or stop active runs first
+(both remain available), then delete the executor Container App and the environment's
+`execution-bindings` storage, remove the API mount if it remains, and rotate the
+bindings account key.
 
 Production execution always requires independent approval in the application;
 an administrator cannot disable it. This rule does not itself authorize a real
