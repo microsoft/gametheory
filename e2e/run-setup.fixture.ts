@@ -392,13 +392,98 @@ export function preflightView(
   }
 }
 
+/** The guided bindings for the golden scenario, as an operator (or a suggestion) sets them. */
+export const guidedBindings = {
+  observations: [
+    {
+      step_id: runIds.readOccupancy,
+      field: 'occupancy_percent',
+      operator: 'gt',
+      value: 85,
+      interval_seconds: 10,
+      timeout_seconds: 600,
+      max_samples: 60,
+    },
+  ],
+  objectives: [
+    {
+      objective_id: runIds.breach,
+      step_id: runIds.readOccupancy,
+      field: 'occupancy_percent',
+      operator: 'gt',
+      value: 85,
+      anchor_step_id: runIds.raise,
+      anchor_field: 'committed_at',
+      within_seconds: 120,
+    },
+    {
+      objective_id: runIds.acknowledged,
+      step_id: runIds.readTicket,
+      field: 'acknowledged',
+      operator: 'eq',
+      value: true,
+      anchor_step_id: runIds.openTicket,
+      anchor_field: 'created_at',
+      within_seconds: 600,
+      source_time_field: 'acknowledged_at',
+    },
+  ],
+  recovery: [
+    {
+      step_id: runIds.openTicket,
+      binding: {
+        configuration_id: runIds.restConfiguration,
+        operation_key: 'ticket.close',
+        operation_version: '1',
+      },
+      parameters: {
+        record_id: { source_step_id: runIds.openTicket, field: 'record_id' },
+        run_id: { source_step_id: runIds.openTicket, field: 'run_id' },
+        expected_version: { source_step_id: runIds.openTicket, field: 'record_version' },
+      },
+      ownership_parameter: 'record_id',
+      version_parameter: 'expected_version',
+    },
+  ],
+} satisfies Pick<Schemas['RunCreate'], 'observations' | 'objectives' | 'recovery'>
+
+/** A reviewed suggestion as the service returns it. Test fixture only; no model is called. */
+export function runCheckSuggestion(
+  changes: Partial<Schemas['RunCheckSuggestionView']> = {},
+): Schemas['RunCheckSuggestionView'] {
+  const valid = <T>(item: T) => ({ item, valid: true, issues: [] })
+  return {
+    id: '31000000-0000-4000-8000-000000000020',
+    preview_id: runIds.preview,
+    prompt: 'Suggest checks for every goal.',
+    status: 'proposed',
+    error: null,
+    created_at: date,
+    summary:
+      'Watch occupancy until it passes 85%, judge both goals from recorded times, and close the exercise ticket afterwards.',
+    observations: guidedBindings.observations.map(valid),
+    objectives: guidedBindings.objectives.map(valid),
+    recovery: guidedBindings.recovery.map(valid),
+    questions: ['Is there a recorded result that shows the cots arrived?'],
+    is_current: true,
+    ...changes,
+  }
+}
+
 export async function runSetupFixture(
   page: Page,
-  options: { idempotencyLiteral?: boolean; blockers?: Schemas['RunBlocker'][] } = {},
+  options: {
+    idempotencyLiteral?: boolean
+    blockers?: Schemas['RunBlocker'][]
+    suggestions?: Schemas['RunCheckSuggestionView'][]
+  } = {},
 ) {
   const { board, preview, configurations } = runSetupBoard(options)
   const requests: { method: string; path: string; body: unknown; ifMatch?: string }[] = []
   const unhandled: string[] = []
+  const suggestions = [...(options.suggestions ?? [])]
+  // An accepted request is reported running once, then proposed, as the worker would.
+  let pending: { id: string; prompt: string; polls: number } | undefined
   await page.route('**/api/**', async (route) => {
     const request: Request = route.request()
     const path = new URL(request.url()).pathname
@@ -454,6 +539,32 @@ export async function runSetupFixture(
     if (path === `${boardPath}/previews`) return respond([preview])
     if (path === `${boardPath}/approvals`) return respond([])
     if (path === `${boardPath}/runs` && method === 'GET') return respond([])
+    if (path === `${boardPath}/run-setup/suggestions` && method === 'POST') {
+      const body = request.postDataJSON() as Schemas['RunCheckRequestInput']
+      pending = { id: body.request_id, prompt: body.prompt, polls: 0 }
+      return respond({ id: body.request_id, status: 'queued' }, 202)
+    }
+    if (path === `${boardPath}/run-setup/suggestions`) {
+      if (pending && pending.polls++ > 0) {
+        suggestions.unshift(runCheckSuggestion({ id: pending.id, prompt: pending.prompt }))
+        pending = undefined
+      }
+      const active = pending
+        ? [
+            runCheckSuggestion({
+              id: pending.id,
+              prompt: pending.prompt,
+              status: 'running',
+              summary: null,
+              observations: [],
+              objectives: [],
+              recovery: [],
+              questions: [],
+            }),
+          ]
+        : []
+      return respond([...active, ...suggestions])
+    }
     if (path === `${boardPath}/runs/preflight`)
       return respond(preflightView(request.postDataJSON(), preview, options.blockers))
     if (path === `${boardPath}/runs` && method === 'POST')

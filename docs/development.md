@@ -115,6 +115,11 @@ Set `GT_SCHEDULER_ENDPOINT`, `GT_SCHEDULER_TASKHUB`,
 developer identity or deployed managed identity. The identity needs native model
 access and **Durable Task Data Contributor** on the selected task hub.
 
+The optional run-check assistant on a board's **Exercise runs** tab also needs
+`GT_RUN_ASSISTANT_ENABLED=true` (off by default, and rejected unless planning is
+enabled). It reuses the planning worker and model, suggests run checks for an explicit
+operator to review, and never creates or starts runs. See [execution](execution.md).
+
 The local scheduler uses `GT_SCHEDULER_ENDPOINT=http://127.0.0.1:8080`,
 `GT_SCHEDULER_EMULATOR=true`, and its configured/default task hub. Emulator mode
 accepts only explicit local addresses, never arbitrary unauthenticated hosts.
@@ -159,7 +164,8 @@ Browser interaction tests use a clearly labeled Vite **test-mode-only** harness 
 network fixtures. That entry is not built into the production bundle, cannot
 authenticate to the API, and is not evidence of SQL/Entra/model integration.
 The real Blob test starts Azurite. The CI job supplies real SQL Server and Scheduler
-emulator services and runs the same application worker with a test-only model fixture.
+emulator services and runs the same application worker with a test-only model fixture,
+for both planning proposals and run-check suggestions.
 Live Entra sign-in, managed identity/RBAC, and Foundry inference require separate
 authorized deployment validation.
 

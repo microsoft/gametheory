@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { runIds, runSetupFixture } from './run-setup.fixture'
+import { guidedBindings, runCheckSuggestion, runIds, runSetupFixture } from './run-setup.fixture'
 
 async function openRunSetup(page: Page) {
   await page.goto(`/w/${runIds.workspace}/boards/${runIds.board}`)
@@ -162,5 +162,107 @@ test('run setup flags a typed SQL idempotency key and survives switching tabs', 
     page.getByRole('group', { name: 'Check 1' }).getByLabel('Reading', { exact: true }),
   ).toHaveValue('occupancy_percent')
   expect(fixture.requests.filter((item) => item.path.includes('/runs'))).toEqual([])
+  expect(fixture.unhandled).toEqual([])
+})
+
+test('operator describes checks in plain words, reviews the suggestion, and creates the run', async ({
+  page,
+}, info) => {
+  const fixture = await runSetupFixture(page)
+  await page.setViewportSize({ width: 1360, height: 1000 })
+  await openRunSetup(page)
+  const assistant = page.getByRole('region', { name: 'Describe what to check' })
+  await expect(assistant.getByText(/No suggestions yet/)).toBeVisible()
+  const request =
+    "Make sure they acknowledge within 10 minutes and watch occupancy until it's above 85%."
+  await assistant.getByLabel('What should this run check?').fill(request)
+  await assistant.getByRole('button', { name: 'Suggest checks', exact: true }).click()
+  await expect(assistant.getByText('Suggesting checks…')).toBeVisible()
+  await expect(assistant.getByText('Suggestions ready')).toBeVisible({ timeout: 10000 })
+  await expect(assistant.getByText(/Watch occupancy until it passes 85%/)).toBeVisible()
+  await expect(assistant.getByText(/recorded result that shows the cots arrived/)).toBeVisible()
+  await expect(assistant.getByText('Valid', { exact: true })).toHaveCount(4)
+  await expect(
+    assistant.getByText(/read “Read occupancy” until occupancy_percent is greater than 85/),
+  ).toBeVisible()
+  // Nothing reaches the forms until the operator chooses.
+  await expect(page.getByRole('group', { name: 'Check 1' })).toHaveCount(0)
+  await page.screenshot({ path: info.outputPath('run-check-suggestion.png'), fullPage: true })
+
+  await assistant.getByRole('button', { name: 'Use these suggestions' }).click()
+  await expect(assistant.getByText(/Added to the forms below/)).toBeVisible()
+  const watch = page.getByRole('group', { name: 'Check 1' })
+  await expect(watch.getByLabel('Reading', { exact: true })).toHaveValue('occupancy_percent')
+  const acknowledged = page.getByRole('group', { name: 'Ticket acknowledged' })
+  await expect(acknowledged.getByLabel('Measure this goal from run evidence')).toBeChecked()
+  await expect(acknowledged.getByLabel('Recorded time', { exact: true })).toHaveValue(
+    'acknowledged_at',
+  )
+  const undo = page.getByRole('group', { name: 'Open resource ticket' })
+  await expect(undo.getByLabel('Undo operation')).toHaveValue(
+    `${runIds.restConfiguration}/ticket.close/1`,
+  )
+  await expect(page.getByText(/These checks started from an assistant suggestion/)).toBeVisible()
+
+  await expect(page.getByRole('button', { name: 'Create pinned run' })).toBeDisabled()
+  await page.getByRole('button', { name: 'Check setup' }).click()
+  await expect(page.getByText(/Ready to create/)).toBeVisible()
+  await page.getByRole('button', { name: 'Create pinned run' }).click()
+  await expect(page.getByText('Run created and pinned.')).toBeVisible()
+
+  const [asked] = fixture.requests.filter((item) => item.path.endsWith('/run-setup/suggestions'))
+  expect(asked.body).toEqual({
+    preview_id: runIds.preview,
+    preview_digest: 'e'.repeat(64),
+    prompt: request,
+    request_id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+  })
+  const [checked, created] = fixture.requests.filter((item) => item.path.includes('/runs'))
+  expect(checked.path).toMatch(/\/runs\/preflight$/)
+  expect(created.body).toEqual(checked.body)
+  expect(created.body).toEqual({
+    preview_id: runIds.preview,
+    preview_digest: 'e'.repeat(64),
+    trigger: 'manual',
+    ...guidedBindings,
+    suggestion_id: (asked.body as { request_id: string }).request_id,
+  })
+  expect(fixture.unhandled).toEqual([])
+})
+
+test('suggestions read well on a narrow dark screen and stale ones stay out of the forms', async ({
+  page,
+}, info) => {
+  const fixture = await runSetupFixture(page, {
+    suggestions: [
+      runCheckSuggestion(),
+      runCheckSuggestion({
+        id: '31000000-0000-4000-8000-000000000021',
+        prompt: 'Watch the ticket.',
+        is_current: false,
+      }),
+    ],
+  })
+  await page.setViewportSize({ width: 390, height: 900 })
+  await openRunSetup(page)
+  await page.getByRole('button', { name: 'Use dark theme' }).click()
+  const assistant = page.getByRole('region', { name: 'Describe what to check' })
+  await expect(assistant.getByText('Suggestions ready').first()).toBeVisible()
+  await assistant.getByText('Earlier requests (1)').click()
+  await expect(assistant.getByText('Earlier preview', { exact: true })).toBeVisible()
+  await expect(assistant.getByRole('button', { name: 'Use these suggestions' })).toHaveCount(1)
+  await expect(
+    assistant.getByRole('button', { name: 'Ask again for the current preview' }),
+  ).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  await page.screenshot({ path: info.outputPath('run-check-mobile-dark.png'), fullPage: true })
+  await assistant.getByLabel('What should this run check?').fill('Also watch the ticket.')
+  await page.getByRole('button', { name: 'Preparation', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Preparation draft' })).toBeVisible()
+  await page.getByRole('button', { name: 'Exercise runs' }).click()
+  await expect(assistant.getByLabel('What should this run check?')).toHaveValue(
+    'Also watch the ticket.',
+  )
+  expect(fixture.requests).toEqual([])
   expect(fixture.unhandled).toEqual([])
 })

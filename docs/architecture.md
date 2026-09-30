@@ -19,7 +19,7 @@ review of a pinned snapshot and is explicitly not authorization to execute it.
 | Azure SQL                                 | Authoritative memberships, drafts, revisions, asset metadata, conversations, proposals, dispatch intents, audit |
 | Private Blob Storage                      | Immutable uploaded asset versions                                                                               |
 | Durable Task Scheduler                    | Orchestration history, activity delivery, retries and restart recovery                                          |
-| Python planning worker                    | Dispatch reconciliation and Agent Framework planning activities                                                 |
+| Python planning worker                    | Dispatch reconciliation, Agent Framework planning, and reviewed run-check suggestions; no target tools          |
 | Separate exercise executor                | Policy-gated SQL/REST activities, run dispatch, durable waits, evidence and recovery                            |
 | Operator-configured Foundry project/model | Model inference; no external mutation tools are exposed                                                         |
 
@@ -154,6 +154,24 @@ This can duplicate **model cost**, even though only one proposal is published.
 Scheduler durability is neither external exactly-once execution nor automatic rollback.
 Persisted orchestration names must not be renamed or incompatibly changed while
 instances are active; introduce a new version and drain old workers when needed.
+
+### Run-check suggestions
+
+The optional run-check assistant (`GT_RUN_ASSISTANT_ENABLED`, off by default and valid
+only with planning enabled) reuses this worker and model boundary with its own tables
+and a new `suggest_run_checks_v1` orchestration. `plan_v1`'s orchestration and activity
+code are unchanged; only the planner's instruction text now asks for measurable
+objective criteria. The API stores a minimized context derived from the pinned preview:
+step and operation declarations, objectives, and registered recovery writes, but no
+target endpoints, resource or identity references, database, connection, or environment
+names, token scopes, parameter values, or assets. The worker's SQL grants cover only the
+suggestion request and dispatch tables in addition to its existing reads; it cannot read
+boards, previews, execution grants, runs, or target records, and it has no target tools
+or identities. It rechecks workspace membership around the model call and publishes
+once. The API rechecks the explicit operator grant, validates every suggested item
+against the pinned preview exactly as run creation would, and records a used suggestion
+as run provenance outside the immutable manifest. A suggestion never creates,
+authorizes, approves, or starts a run. See [execution](execution.md).
 
 Model requests have a timeout and output-token budget; activity retries are bounded.
 No model deployment is selected implicitly. When planning is disabled, the UI says

@@ -3631,6 +3631,136 @@
           }
         }
       }
+    },
+    "/api/workspaces/{wid}/boards/{bid}/run-setup/suggestions": {
+      "get": {
+        "tags": [
+          "Run setup"
+        ],
+        "summary": "Suggestions",
+        "description": "The board's latest suggestion requests, newest first, each reviewed against its preview.",
+        "operationId": "suggestions_api_workspaces__wid__boards__bid__run_setup_suggestions_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RunCheckSuggestionView"
+                  },
+                  "title": "Response Suggestions Api Workspaces  Wid  Boards  Bid  Run Setup Suggestions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Run setup"
+        ],
+        "summary": "Request Suggestions",
+        "description": "Queue a request for suggested run checks. It never creates or changes a run.",
+        "operationId": "request_suggestions_api_workspaces__wid__boards__bid__run_setup_suggestions_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wid"
+            }
+          },
+          {
+            "name": "bid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCheckRequestInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunCheckRequestAccepted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6319,6 +6449,84 @@
         "title": "RestInvocation",
         "description": "Description only: expected_version maps to future strong If-Match.\n\nIt is a string with explicit max_length and a bare, unquoted opaque value.\nThe future dispatcher owns Idempotency-Key; catalogs cannot supply headers.\nRemaining non-path parameters are GET query fields or a flat write body."
       },
+      "ReviewedObjective": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/ObjectiveRule"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item",
+          "valid",
+          "issues"
+        ],
+        "title": "ReviewedObjective"
+      },
+      "ReviewedObservation": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/Observation"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item",
+          "valid",
+          "issues"
+        ],
+        "title": "ReviewedObservation"
+      },
+      "ReviewedRecovery": {
+        "properties": {
+          "item": {
+            "$ref": "#/components/schemas/RecoveryBinding"
+          },
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item",
+          "valid",
+          "issues"
+        ],
+        "title": "ReviewedRecovery"
+      },
       "RunApprovalInput": {
         "properties": {
           "context_id": {
@@ -6474,6 +6682,170 @@
         "title": "RunBlocker",
         "description": "A current reason an action is unavailable and who can resolve it."
       },
+      "RunCheckRequestAccepted": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "proposed",
+              "failed"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "RunCheckRequestAccepted"
+      },
+      "RunCheckRequestInput": {
+        "properties": {
+          "preview_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Preview Id"
+          },
+          "preview_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Preview Digest"
+          },
+          "prompt": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Prompt"
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "preview_id",
+          "preview_digest",
+          "prompt",
+          "request_id"
+        ],
+        "title": "RunCheckRequestInput"
+      },
+      "RunCheckSuggestionView": {
+        "properties": {
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewedObservation"
+            },
+            "type": "array",
+            "title": "Observations"
+          },
+          "objectives": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewedObjective"
+            },
+            "type": "array",
+            "title": "Objectives"
+          },
+          "recovery": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewedRecovery"
+            },
+            "type": "array",
+            "title": "Recovery"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "preview_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Preview Id"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "proposed",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Questions"
+          },
+          "is_current": {
+            "type": "boolean",
+            "title": "Is Current"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "observations",
+          "objectives",
+          "recovery",
+          "id",
+          "preview_id",
+          "prompt",
+          "status",
+          "error",
+          "created_at",
+          "summary",
+          "questions",
+          "is_current"
+        ],
+        "title": "RunCheckSuggestionView",
+        "description": "A stored request and, once proposed, its suggestion reviewed against the pinned\npreview. Nothing here is applied or created until the operator does so."
+      },
       "RunControl": {
         "properties": {
           "action": {
@@ -6548,6 +6920,18 @@
             "type": "array",
             "maxItems": 100,
             "title": "Recovery"
+          },
+          "suggestion_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggestion Id"
           }
         },
         "additionalProperties": false,
@@ -7129,6 +7513,10 @@
             "type": "boolean",
             "title": "Target Bindings Configured"
           },
+          "run_assistant_enabled": {
+            "type": "boolean",
+            "title": "Run Assistant Enabled"
+          },
           "message": {
             "type": "string",
             "title": "Message"
@@ -7141,6 +7529,7 @@
           "sql_configured",
           "scheduler_configured",
           "target_bindings_configured",
+          "run_assistant_enabled",
           "message"
         ],
         "title": "RuntimeStatus"

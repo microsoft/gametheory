@@ -59,7 +59,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         config: {
           cloud: 'commercial',
           auth: { configured: true, client_id: 'test', authority: '', scope: '' },
-          capabilities: { authoring: true, assets: true, planning: true, execution: false },
+          capabilities: {
+            authoring: true,
+            assets: true,
+            planning: true,
+            execution: false,
+            run_assistant: true,
+          },
           max_upload_bytes: 10485760,
         },
       }}

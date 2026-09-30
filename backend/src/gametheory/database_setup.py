@@ -34,6 +34,8 @@ API_PERMISSIONS = {
     "assets": "SELECT, INSERT, UPDATE",
     "planning_requests": "SELECT, INSERT, UPDATE",
     "dispatch_intents": "SELECT, INSERT",
+    "run_setup_requests": "SELECT, INSERT, UPDATE",
+    "run_setup_dispatch_intents": "SELECT, INSERT",
     "audit": "SELECT, INSERT",
     "boards": "SELECT, INSERT, UPDATE",
     **{
@@ -68,6 +70,10 @@ WORKER_PERMISSIONS = {
     },
     "planning_requests": "SELECT, UPDATE",
     "dispatch_intents": "SELECT, UPDATE",
+    # Run-check suggestions carry a minimized context; the worker never reads boards,
+    # previews, or execution tables, and cannot reach target systems.
+    "run_setup_requests": "SELECT, UPDATE",
+    "run_setup_dispatch_intents": "SELECT, UPDATE",
     "audit": "INSERT",
 }
 

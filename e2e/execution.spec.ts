@@ -44,6 +44,7 @@ async function settingsFixture(page: Page, admin = true) {
         sql_configured: true,
         scheduler_configured: false,
         target_bindings_configured: false,
+        run_assistant_enabled: false,
         message:
           'Configuration is not live readiness. This is a UI fixture, not a deployed environment.',
       }

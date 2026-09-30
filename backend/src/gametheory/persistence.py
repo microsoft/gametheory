@@ -484,6 +484,49 @@ class RunDispatch(Base):
     delivered_version: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class RunSetupRequest(Base):
+    """An operator's request for reviewable run-check suggestions; never a run."""
+
+    __tablename__ = "run_setup_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('queued', 'running', 'proposed', 'failed')",
+            name="ck_run_setup_request_status",
+        ),
+        Index("ix_run_setup_requests_board_created", "board_id", "created_at"),
+        Index(
+            "uq_active_run_setup_request",
+            "board_id",
+            unique=True,
+            mssql_where=text("status IN ('queued', 'running')"),
+        ),
+    )
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    board_id: Mapped[str] = mapped_column(ForeignKey("boards.id"))
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"))
+    preview_id: Mapped[str] = mapped_column(ForeignKey("board_previews.id"))
+    preview_digest: Mapped[str] = mapped_column(String(64))
+    actor: Mapped[str] = mapped_column(String(36))
+    prompt: Mapped[str] = mapped_column(Unicode(4000))
+    context: Mapped[str] = mapped_column(UnicodeText)
+    status: Mapped[str] = mapped_column(String(20), default="queued")
+    suggestion: Mapped[str | None] = mapped_column(UnicodeText, nullable=True)
+    error: Mapped[str | None] = mapped_column(Unicode(2000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now)
+    finished_at: Mapped[datetime | None] = mapped_column(PREPARATION_DATETIME, nullable=True)
+
+
+class RunSetupDispatchIntent(Base):
+    __tablename__ = "run_setup_dispatch_intents"
+    request_id: Mapped[str] = mapped_column(ForeignKey("run_setup_requests.id"), primary_key=True)
+    state: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt: Mapped[datetime] = mapped_column(PREPARATION_DATETIME, default=now, index=True)
+    lease_until: Mapped[datetime | None] = mapped_column(PREPARATION_DATETIME, nullable=True)
+    lease_token: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Unicode(2000), nullable=True)
+
+
 @lru_cache
 def session_factory() -> sessionmaker[Session]:
     url = get_settings().sql_url

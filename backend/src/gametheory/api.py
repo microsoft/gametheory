@@ -52,6 +52,7 @@ from gametheory.persistence import (
 )
 from gametheory.preparation_api import router as preparation_router
 from gametheory.preparation_service import preparation_workspace, revoke_reviewer_access
+from gametheory.run_setup_api import router as run_setup_router
 from gametheory.service import (
     audit,
     expected_version,
@@ -146,6 +147,7 @@ def config() -> dict[str, object]:
             "authoring": bool(settings.sql_url),
             "assets": bool(settings.blob_url or settings.blob_connection_string),
             "planning": settings.planning_enabled,
+            "run_assistant": settings.run_assistant_enabled,
             "execution": settings.execution_enabled,
         },
         "max_upload_bytes": settings.max_upload_bytes,
@@ -726,6 +728,7 @@ def decide_proposal(
 app.include_router(preparation_router)
 app.include_router(settings_router)
 app.include_router(execution_router)
+app.include_router(run_setup_router)
 
 dist = Path(get_settings().web_dist)
 if (dist / "assets").is_dir():

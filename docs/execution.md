@@ -162,6 +162,75 @@ Run setup is kept while switching board tabs. **Settings file (advanced)** expor
 and imports the same `RunCreate` bindings; imported values fill the forms and are
 validated again. There is no second contract.
 
+## Run-check assistant (optional)
+
+The run-check assistant is an early, narrow slice of reviewed AI suggestions for run
+bindings. It is **off by default**: set `GT_RUN_ASSISTANT_ENABLED=true` only where AI
+planning is already enabled and configured, because it uses the planning worker and
+model. `/api/config` reports it as `capabilities.run_assistant`, and **Settings →
+Runtime status** shows whether it is enabled. When it is off, the panel is hidden and
+the API answers `503`; the guided forms work exactly as before.
+
+On **Exercise runs**, an explicitly granted operator can **Describe what to check** in
+plain words ("make sure they acknowledge within 10 minutes and watch occupancy until
+it's above 85%") or press **Suggest checks for every goal**. The assistant proposes
+observations, objective rules, and recovery bindings, plus plain-language questions
+for goals it cannot measure from declared results. It only suggests:
+
+- It never creates, authorizes, approves, schedules, or starts a run.
+- It never chooses notification recipients or senders; items that use a notification
+  step are marked invalid.
+- It never grants access and never contacts a target system. It runs in the planning
+  worker, which has no target tools, identities, or execution-table grants.
+
+Nothing is applied automatically. Each suggested item is validated against the exact
+pinned preview with the same located checks run creation uses (`execution_issues`),
+and is shown in the forms' own plain language with a **Valid** or **Needs changes**
+badge. **Use these suggestions** replaces the watches, goal rules, and undo plan
+(after confirming if the forms already have checks; the start choice is kept); **Add
+to my checks** fills only read steps without a check, unmeasured goals, and manually
+undone changes. Only valid items are mapped, through the same settings-file import as
+**Settings file (advanced)**, and any skipped item is explained. The operator still
+edits, runs **Check before creating**, and creates the run.
+
+The worker never sees the preview itself. At request time the API stores a minimized
+context: the window length; each step's ID, label, kind, dependencies, and whether it
+sits on a branch; operation labels, effects, and parameter/result declarations (name,
+type, required, choices, bounds); scenario objectives (ID, title, criterion); and the
+registered writes available for recovery. Endpoints, resource and identity
+references, database names, token scopes, connection and environment names,
+procedure and path details, parameter values, and assets are never included.
+Dispatcher-owned SQL `idempotency_key` parameters are omitted. Scenario text and
+prompts are treated as untrusted; the model returns JSON validated against a bounded
+schema with no fields for triggers, steps, recipients, grants, or approvals. Invalid
+output fails the request with a safe message and never stores provider text.
+
+Requests are idempotent by client `request_id`, limited to one active request per
+board (also enforced by a filtered unique index), bounded to 4,000 characters, and
+audited as `run_setup.suggestion_requested`. Each request pins the exact current
+preview and digest; after the board changes, older suggestions show as for an earlier
+preview and cannot be used. Listing and every use recheck the operator grant; the
+worker rechecks workspace membership before and after the model call and publishes
+once with a conditional update. A lost Scheduler history closes the request instead
+of blocking the board, since suggestions have no external effects.
+
+Using a suggestion records provenance only. The forms link a suggestion only when
+applying it filled at least one watch, goal rule, or undo binding; when it would add
+nothing new, the forms and any existing link are left unchanged. Edited suggested
+items stay linked, but once the operator removes every item a suggestion filled (or
+chooses **Don't record the suggestion**, or imports a settings file), the link is
+dropped and does not come back on its own. `RunCreate.suggestion_id` (also accepted
+by preflight) must name a proposed suggestion for the same board and preview. It is
+recorded in the `run.prepared` event detail and a `run_setup.suggestion_used` audit
+record that shares the creation's correlation ID. It never enters the
+`exercise-execution/v2` manifest, so manifest digests and historical runs are
+unchanged.
+
+```text
+GET  /api/workspaces/{wid}/boards/{bid}/run-setup/suggestions   latest 20, newest first
+POST /api/workspaces/{wid}/boards/{bid}/run-setup/suggestions   202 {preview_id, preview_digest, prompt, request_id}
+```
+
 The initial runtime executes a bounded acyclic graph serially, with at most one
 active run per board and at most 1,000 attempts across exercise and recovery.
 Independent boards remain isolated. Conditions use typed results from guaranteed
@@ -191,7 +260,9 @@ comparison and literal or prior-result value. Optional `anchor_step_id`,
 uses the actual observation timestamp. Equality at the deadline is timely.
 Point observations do not prove complete historical coverage: absent evidence,
 missing clocks, and a late observation without an authoritative late source event
-remain indeterminate. Unbound free-text objectives are not interpreted by a model.
+remain indeterminate. Unbound free-text objectives are not interpreted by a model
+during a run; the optional run-check assistant only suggests bindings for an
+operator to review before creation.
 
 ### Authoritative milestone evidence
 
@@ -283,7 +354,9 @@ docker build --target executor -t gametheory-executor:REVIEWED_TAG .
 The optional executor principal is distinct. The planning worker's grants are not
 expanded to execution tables or external targets. Readiness insertion and DDL
 remain operator-only. Grant helpers add table privileges, not broad roles, and
-do not remove older unrelated grants; inspect effective permissions.
+do not remove older unrelated grants; inspect effective permissions. Migration
+`0005` adds the run-check assistant's request and dispatch tables; rerun the grant
+command so the API and planning worker receive exactly their new table grants.
 
 Configure `GT_EXECUTION_ENABLED=true`, a separate `GT_EXECUTION_TASKHUB`,
 `GT_EXECUTION_BINDINGS_FILE`, and the existing tenant/SQL/Scheduler settings.

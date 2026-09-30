@@ -706,6 +706,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/workspaces/{wid}/boards/{bid}/run-setup/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Suggestions
+         * @description The board's latest suggestion requests, newest first, each reviewed against its preview.
+         */
+        get: operations["suggestions_api_workspaces__wid__boards__bid__run_setup_suggestions_get"];
+        put?: never;
+        /**
+         * Request Suggestions
+         * @description Queue a request for suggested run checks. It never creates or changes a run.
+         */
+        post: operations["request_suggestions_api_workspaces__wid__boards__bid__run_setup_suggestions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1917,6 +1941,30 @@ export interface components {
             /** Path */
             path: string;
         };
+        /** ReviewedObjective */
+        ReviewedObjective: {
+            item: components["schemas"]["ObjectiveRule"];
+            /** Valid */
+            valid: boolean;
+            /** Issues */
+            issues: string[];
+        };
+        /** ReviewedObservation */
+        ReviewedObservation: {
+            item: components["schemas"]["Observation"];
+            /** Valid */
+            valid: boolean;
+            /** Issues */
+            issues: string[];
+        };
+        /** ReviewedRecovery */
+        ReviewedRecovery: {
+            item: components["schemas"]["RecoveryBinding"];
+            /** Valid */
+            valid: boolean;
+            /** Issues */
+            issues: string[];
+        };
         /** RunApprovalInput */
         RunApprovalInput: {
             /**
@@ -1979,6 +2027,76 @@ export interface components {
             /** Configuration Id */
             configuration_id?: string | null;
         };
+        /** RunCheckRequestAccepted */
+        RunCheckRequestAccepted: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "proposed" | "failed";
+        };
+        /** RunCheckRequestInput */
+        RunCheckRequestInput: {
+            /**
+             * Preview Id
+             * Format: uuid
+             */
+            preview_id: string;
+            /** Preview Digest */
+            preview_digest: string;
+            /** Prompt */
+            prompt: string;
+            /**
+             * Request Id
+             * Format: uuid
+             */
+            request_id: string;
+        };
+        /**
+         * RunCheckSuggestionView
+         * @description A stored request and, once proposed, its suggestion reviewed against the pinned
+         *     preview. Nothing here is applied or created until the operator does so.
+         */
+        RunCheckSuggestionView: {
+            /** Observations */
+            observations: components["schemas"]["ReviewedObservation"][];
+            /** Objectives */
+            objectives: components["schemas"]["ReviewedObjective"][];
+            /** Recovery */
+            recovery: components["schemas"]["ReviewedRecovery"][];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Preview Id
+             * Format: uuid
+             */
+            preview_id: string;
+            /** Prompt */
+            prompt: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "running" | "proposed" | "failed";
+            /** Error */
+            error: string | null;
+            /** Created At */
+            created_at: string;
+            /** Summary */
+            summary: string | null;
+            /** Questions */
+            questions: string[];
+            /** Is Current */
+            is_current: boolean;
+        };
         /** RunControl */
         RunControl: {
             /**
@@ -2010,6 +2128,8 @@ export interface components {
             objectives?: components["schemas"]["ObjectiveRule"][];
             /** Recovery */
             recovery?: components["schemas"]["RecoveryBinding"][];
+            /** Suggestion Id */
+            suggestion_id?: string | null;
         };
         /** RunEventView */
         RunEventView: {
@@ -2220,6 +2340,8 @@ export interface components {
             scheduler_configured: boolean;
             /** Target Bindings Configured */
             target_bindings_configured: boolean;
+            /** Run Assistant Enabled */
+            run_assistant_enabled: boolean;
             /** Message */
             message: string;
         };
@@ -4319,6 +4441,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggestions_api_workspaces__wid__boards__bid__run_setup_suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wid: string;
+                bid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunCheckSuggestionView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_suggestions_api_workspaces__wid__boards__bid__run_setup_suggestions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                wid: string;
+                bid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunCheckRequestInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunCheckRequestAccepted"];
                 };
             };
             /** @description Validation Error */

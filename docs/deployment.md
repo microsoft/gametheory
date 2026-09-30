@@ -205,6 +205,21 @@ target activation and runtime prerequisites are never optional. Validate the
 ordinary UI workflow, revocation/stop behavior, immutable history, recovery
 conflicts, and dependency failure before approving live use.
 
+## Run-check assistant rollout
+
+The run-check assistant is off by default. `GT_RUN_ASSISTANT_ENABLED=true` is accepted
+only when planning is enabled and fully configured; set it on both the API and the
+planning worker (`gametheory-worker`), never on the executor. Application migration
+`0005` adds `run_setup_requests` and `run_setup_dispatch_intents`. Apply it with the
+migration operator, then rerun `gametheory database-grants`: the API receives
+select/insert/update on requests and select/insert on intents, and the planning worker
+receives select/update on those two tables only. No execution, board, preview, or
+target table is granted to the planning worker. The worker registers the new
+`suggest_run_checks_v1` orchestration beside the pinned `plan_v1`, and dispatches it
+only while the setting is on. Turning it off hides the panel and returns `503` from
+the suggestion API; suggestions already linked to runs remain recorded as provenance.
+Validate the same model, identity, and network checks as planning before enabling it.
+
 ## Partial deployment and private dependency probes
 
 `ProvisioningDisabled` on SQL server creation is a regional/subscription gate, not

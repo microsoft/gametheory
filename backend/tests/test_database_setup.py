@@ -5,6 +5,7 @@ import pytest
 
 from gametheory.database_setup import (
     API_PERMISSIONS,
+    EXECUTOR_PERMISSIONS,
     WORKER_PERMISSIONS,
     provision_runtime_users,
 )
@@ -42,6 +43,26 @@ def test_runtime_grants_use_client_sid_and_keep_immutable_tables_read_insert_onl
     assert "preparation_collections" not in WORKER_PERMISSIONS
     assert "boards" not in WORKER_PERMISSIONS
     assert not any("ALTER" in statement or "CONTROL" in statement for statement in statements)
+
+
+def test_run_check_suggestions_keep_the_worker_away_from_boards_and_execution():
+    assert API_PERMISSIONS["run_setup_requests"] == "SELECT, INSERT, UPDATE"
+    assert API_PERMISSIONS["run_setup_dispatch_intents"] == "SELECT, INSERT"
+    assert WORKER_PERMISSIONS["run_setup_requests"] == "SELECT, UPDATE"
+    assert WORKER_PERMISSIONS["run_setup_dispatch_intents"] == "SELECT, UPDATE"
+    for table in (
+        "boards",
+        "board_previews",
+        "connection_configurations",
+        "execution_grants",
+        "exercise_runs",
+        "run_events",
+        "run_dispatches",
+        "target_readiness",
+    ):
+        assert table not in WORKER_PERMISSIONS
+    assert "run_setup_requests" not in EXECUTOR_PERMISSIONS
+    assert "run_setup_dispatch_intents" not in EXECUTOR_PERMISSIONS
 
 
 def test_existing_or_shared_identity_cannot_be_repurposed():

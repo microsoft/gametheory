@@ -40,6 +40,9 @@ The new document-first, mineral/ocean studio provides:
   pause/stop, durable evidence, objective findings, and explicit recovery.
 - Guided run setup forms, a non-mutating check before creating a run, and a launch
   checklist that explains every blocker and who can resolve it.
+- An opt-in run-check assistant (off by default): operators describe checks in plain
+  words, then review suggested watches, goal rules, and undo bindings in the forms.
+  It only suggests; it never creates, authorizes, or starts a run.
 
 **Execution is disabled by default and requires separate deployment configuration
 and authorized target readiness.** Publishing a revision, registering a connection, or approving a
