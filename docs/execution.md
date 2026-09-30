@@ -362,8 +362,12 @@ Configure `GT_EXECUTION_ENABLED=true`, a separate `GT_EXECUTION_TASKHUB`,
 `GT_EXECUTION_BINDINGS_FILE`, and the existing tenant/SQL/Scheduler settings.
 Run `gametheory-executor` separately from `gametheory-worker`. The API needs the
 same public/non-secret execution configuration to evaluate readiness. Do not mount
-target credentials or attach target identities to the API or planner. The existing
-greenfield Bicep does not deploy this executor or activate exercise targets.
+target credentials or attach target identities to the API or planner. In
+`infra/main.bicep`, both executor flags default to off: `deployExecutor=true`
+provisions the executor identity, `exercises` task hub, and private bindings share
+without running anything, and `enableExecution=true` starts the executor and sets
+these values on the API. Neither activates exercise targets; see the
+[opt-in executor rollout](deployment.md#opt-in-executor-rollout).
 Provisioning, identity attachment, task-hub grants, networking, and rollout require
 a separate concrete deployment approval.
 

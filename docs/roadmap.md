@@ -92,12 +92,13 @@ environment after A12 passes.
 
 ### P2: Deployable executor
 
-The existing template does not deploy the executor; see the
+`infra/main.bicep` includes the executor behind `deployExecutor` and
+`enableExecution`, which default to off; see the
 [opt-in executor rollout](deployment.md#opt-in-executor-rollout).
 
-| Item | Scope                                                                                                                                                                                                                                                                                                                              | Status      |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| N4†  | Add the executor to `infra/` behind a flag that defaults off: its own managed identity, a separate execution task hub with a task-hub-scoped grant, the Container App, a read-only bindings-file mount, and matching non-secret API settings. Document `database-grants --executor-client-id`. `GT_EXECUTION_ENABLED` stays false. | Not started |
+| Item | Scope                                                                                                                                                                                                                                                                                                                                                                                                        | Status                                 |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
+| N4†  | Add the executor to `infra/` behind flags that default off: its own managed identity, a separate execution task hub with a task-hub-scoped grant, the Container App, a read-only bindings-file mount from a private share, and matching non-secret API settings. Document `database-grants --executor-client-id`. `enableExecution` defaults to false; turning it on needs the separate deployment approval. | Template done; deployment not approved |
 
 Deploying N4 requires a separate, concrete deployment approval. Target identities
 are never attached to the API or the planning worker.
