@@ -49,7 +49,11 @@ Standard offering; use `planningModelName`/`planningModelVersion` with
 Global routing is not an option in this template. The planner calls the Foundry
 project Responses API. On 2026-09-30, GPT-6-luna (`2026-09-22`) returned HTTP 500
 there, while its Chat Completions and account-level Responses calls succeeded.
-Select it only after the Foundry proposal probe below passes. The planner's
+Select it only after the Foundry proposal probe below passes. The model deployment is
+named after the model, so switching models creates a new deployment and updates
+`GT_MODEL_DEPLOYMENT`. Delete the previous deployment after the probe passes to release
+its quota. Reusing a deleted deployment's name for a different model returned HTTP 500s
+from the project Responses API for more than 15 minutes. The planner's
 `GT_PLANNER_MAX_OUTPUT_TOKENS` budget includes the model's reasoning tokens. Check
 actual model-capacity results as well as
 catalog entries and quota; a listed SKU does not prove regional availability. The

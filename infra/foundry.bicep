@@ -34,7 +34,8 @@ resource project 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
 }
 resource model 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
   parent: account
-  name: 'scenario-planner'
+  // A deployment cannot change models in place; a new name also avoids stale project routing.
+  name: modelName
   sku: { name: modelSku, capacity: 50 }
   properties: {
     model: { format: 'OpenAI', name: modelName, version: modelVersion }
