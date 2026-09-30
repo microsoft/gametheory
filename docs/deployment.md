@@ -55,8 +55,8 @@ named after the model, so switching models creates a new deployment and updates
 its quota. Reusing a deleted deployment's name for a different model returned HTTP 500s
 from the project Responses API for more than 15 minutes. The planner's
 `GT_PLANNER_MAX_OUTPUT_TOKENS` budget includes the model's reasoning tokens. Check
-actual model-capacity results as well as
-catalog entries and quota; a listed SKU does not prove regional availability. The
+actual model-capacity results as well as catalog entries and quota; a listed SKU does
+not prove regional availability. The
 three DNS zones come from commercial account private-link metadata; the worker
 receives Foundry User only on this project. No hosted Agent Service or external
 tools are provisioned. Project, model, and private endpoint creation are serialized
