@@ -71,6 +71,7 @@ Entra registrations, SQL migrations, administrator bootstrap, and local commands
 Missing configuration produces explicit errors, not an authentication bypass or
 simulated data.
 
+- [Roadmap and current status](docs/roadmap.md)
 - [Architecture and behavioral contracts](docs/architecture.md)
 - [Generic preparation and operation contracts](docs/preparation-contracts.md)
 - [Environment policies and exercise execution](docs/execution.md)
