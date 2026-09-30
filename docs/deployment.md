@@ -31,6 +31,9 @@ Review its address ranges, SKUs, retention, egress, registry exposure, regional
 availability, and private DNS ownership. SQL, Blob, and Scheduler public data-plane
 access are disabled. Registry access is public but identity-authenticated; organizations
 requiring a private registry must adapt the registry/network design before deployment.
+The template declares no network security groups. If governance attaches them to its
+subnets, each redeployment detaches them until governance reattaches them, so
+reattach them right after deploying.
 
 The Scheduler private DNS zone name is an explicit input, because it must come
 from the target service's supported private-link configuration, not a guessed DNS
@@ -269,7 +272,11 @@ The bindings mount has these trade-offs:
 
 - App Service and Container Apps mount Azure Files only with the storage account key,
   so the bindings account allows shared-key access. The policy exemption must cover
-  this account only; SQL, Blob, and Scheduler access stay identity-based.
+  this account only; SQL, Blob, and Scheduler access stay identity-based. A Modify
+  policy that disables local authentication does not fail the deployment. It turns
+  shared-key access off during creation, and the mounts fail later. Before
+  `enableExecution=true`, confirm that `allowSharedKeyAccess` is still true on the
+  account. If it isn't, create the exemption, then turn shared-key access back on.
 - The key is held in the App Service configuration and the Container Apps environment
   storage, never in template outputs. The template reads the account's first key.
   Rotation means regenerating that key, redeploying, and restarting the executor
