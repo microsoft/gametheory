@@ -41,11 +41,22 @@ the combined network deployment. Compilation does not verify private DNS.
 Use `schedulerName` to adopt that same scheduler into the combined deployment.
 
 For an isolated validation deployment, `deployFoundry=true` additionally creates
-a private Foundry account/project and a regional GPT-4.1-mini Standard deployment
-(50 capacity units). `planningModelSku=DataZoneStandard` can instead keep inference
-within the deployment's data zone (US for a US-region account). Global routing is
-not an option in this template. Check actual model-capacity results as well as
-catalog entries and quota; a listed SKU does not prove regional availability. The
+a private Foundry account/project and a GPT-5.6-luna (`2026-07-09`) DataZoneStandard
+deployment (50 capacity units), keeping inference within the deployment's data zone
+(US for a US-region account). Neither GPT-5.6-luna nor GPT-6-luna has a regional
+Standard offering; use `planningModelName`/`planningModelVersion` with
+`planningModelSku=Standard` only for a model that offers it in the target region.
+Global routing is not an option in this template. The planner calls the Foundry
+project Responses API. On 2026-09-30, GPT-6-luna (`2026-09-22`) returned HTTP 500
+there, while its Chat Completions and account-level Responses calls succeeded.
+Select it only after the Foundry proposal probe below passes. The model deployment is
+named after the model, so switching models creates a new deployment and updates
+`GT_MODEL_DEPLOYMENT`. Delete the previous deployment after the probe passes to release
+its quota. Reusing a deleted deployment's name for a different model returned HTTP 500s
+from the project Responses API for more than 15 minutes. The planner's
+`GT_PLANNER_MAX_OUTPUT_TOKENS` budget includes the model's reasoning tokens. Check
+actual model-capacity results as well as catalog entries and quota; a listed SKU does
+not prove regional availability. The
 three DNS zones come from commercial account private-link metadata; the worker
 receives Foundry User only on this project. No hosted Agent Service or external
 tools are provisioned. Project, model, and private endpoint creation are serialized

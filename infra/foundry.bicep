@@ -4,7 +4,9 @@ param virtualNetworkId string
 param subnetId string
 param workerPrincipalId string
 @allowed(['Standard', 'DataZoneStandard'])
-param modelSku string = 'Standard'
+param modelSku string = 'DataZoneStandard'
+param modelName string = 'gpt-5.6-luna'
+param modelVersion string = '2026-07-09'
 
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: name
@@ -32,10 +34,11 @@ resource project 'Microsoft.CognitiveServices/accounts/projects@2025-06-01' = {
 }
 resource model 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
   parent: account
-  name: 'scenario-planner'
+  // A deployment cannot change models in place; a new name also avoids stale project routing.
+  name: modelName
   sku: { name: modelSku, capacity: 50 }
   properties: {
-    model: { format: 'OpenAI', name: 'gpt-4.1-mini', version: '2025-04-14' }
+    model: { format: 'OpenAI', name: modelName, version: modelVersion }
     raiPolicyName: 'Microsoft.DefaultV2'
     versionUpgradeOption: 'OnceCurrentVersionExpired'
   }

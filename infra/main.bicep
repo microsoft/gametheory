@@ -48,7 +48,10 @@ param modelDeployment string = ''
 param deployFoundry bool = false
 @allowed(['Standard', 'DataZoneStandard'])
 @description('Use a supported regional or data-zone model SKU; global routing is not enabled by this template.')
-param planningModelSku string = 'Standard'
+param planningModelSku string = 'DataZoneStandard'
+@description('OpenAI model and version for the dedicated Foundry deployment. Confirm the SKU is offered for it in the target region.')
+param planningModelName string = 'gpt-5.6-luna'
+param planningModelVersion string = '2026-07-09'
 
 var suffix = uniqueString(resourceGroup().id)
 var stem = '${namePrefix}-${suffix}'
@@ -305,6 +308,8 @@ module foundry './foundry.bicep' = if (deployFoundry) {
     subnetId: privateSubnet
     workerPrincipalId: workerIdentity.properties.principalId
     modelSku: planningModelSku
+    modelName: planningModelName
+    modelVersion: planningModelVersion
   }
 }
 var commonSettings = [

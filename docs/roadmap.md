@@ -15,8 +15,9 @@ targets, or sending email.
 Code for pilot build steps 2 through 4 is complete and proven in CI with real SQL
 Server, the Scheduler emulator, and the isolated HTTPS lab. Step 1's resource and
 policy decisions remain open, and nothing has run against live targets yet. The
-studio is being deployed to a new commercial tenant (P1). Execution stays
-disabled until an executor deployment and approved targets exist (P2, P3).
+studio runs in a new commercial tenant with planning on; its live acceptance is
+open (P1). Execution stays disabled until an executor deployment and approved
+targets exist (P2, P3).
 
 | Pilot build step ([§8](flood-response-pilot-plan.md#8-build-sequence-and-gates)) | Status                                                                                                                   |
 | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -67,8 +68,12 @@ through P4.
 
 ### P1: Studio in the new commercial tenant (in progress)
 
-The studio is moving from the previous tenant's West US 3 environment to a new
-commercial tenant in North Central US, with gpt-6-luna as the planning model.
+The studio is deployed in a new commercial tenant in North Central US
+(`rg-gametheory-ncus`); the previous tenant's West US 3 environment is still running.
+Steps 1 through 4 are complete: planning is on, and the run-check assistant and
+execution are off. The planning model is GPT-5.6-luna. GPT-6-luna returned HTTP 500
+from the Foundry project Responses API that the planner calls; see the
+[Foundry model notes](deployment.md#what-the-template-contains) before switching.
 Follow [required operator inputs and gates](deployment.md#required-operator-inputs-and-gates)
 and the [run-check assistant rollout](deployment.md#run-check-assistant-rollout):
 
@@ -82,10 +87,19 @@ and the [run-check assistant rollout](deployment.md#run-check-assistant-rollout)
    network, and model checks pass. Execution stays off. If A11 shows truncated
    proposals, raise `plannerMaxOutputTokens`.
 
-| Item | Live gate                                                                                                                                  | Status |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
-| A11  | The deployed model produces a real planning proposal that is reviewed and applied, plus a run-check suggestion if the assistant is enabled | Open   |
-| A12† | The studio [live acceptance](deployment.md#live-acceptance) checklist, including `backend/tests/test_live_api.py`                          | Open   |
+| Item | Live gate                                                                                                                                  | Status  |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------- |
+| A11  | The deployed model produces a real planning proposal that is reviewed and applied, plus a run-check suggestion if the assistant is enabled | Partial |
+| A12† | The studio [live acceptance](deployment.md#live-acceptance) checklist, including `backend/tests/test_live_api.py`                          | Partial |
+
+A11: from inside the application network, the deployed model returned a schema-valid
+planning proposal with a measurable objective in 5.1 seconds. A proposal that is
+reviewed and applied in the studio is still required. The run-check assistant is off,
+so no suggestion is needed yet.
+
+A12: private DNS for Blob, Scheduler, and Foundry, a managed Scheduler activity, and a
+private Blob round trip passed. Sign-in, authoring, SQL access by the runtime
+identities, `test_live_api.py`, and the rest of the checklist are open.
 
 Decision for the owner: whether and when to retire the previous tenant's West US 3
 environment after A12 passes.
