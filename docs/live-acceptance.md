@@ -73,8 +73,10 @@ Two targets:
    Remove-Item Env:AZURE_CONFIG_DIR
    ```
 
-3. **Optional other tenant for S2.** Any tenant your Azure CLI can sign in to provides
-   the wrong-tenant token.
+3. **Optional other tenant for S2.** Any tenant where an account in your Azure CLI is
+   signed in provides the wrong-tenant token. It can be a different account, added with
+   `az login --tenant <other-tenant-id>`, as long as that tenant has a subscription the
+   CLI lists; otherwise the default account must be able to sign in there.
 
 4. **API logs.** The main template sends the web app's console, HTTP, and platform logs
    to the deployment's Log Analytics workspace. For a studio deployed before that

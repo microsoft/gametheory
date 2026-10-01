@@ -34,15 +34,18 @@ function Get-AzText {
 
 function Get-AccessToken {
     # Returns a short-lived token for a scope or resource, optionally from another az profile.
+    # -Subscription selects the cached account that owns it, which -Tenant cannot.
     param(
         [string] $Scope,
         [string] $Resource,
         [string] $Tenant,
+        [string] $Subscription,
         [string] $ConfigDirectory
     )
     $arguments = @('account', 'get-access-token', '--query', 'accessToken', '--output', 'tsv')
     $arguments += if ($Scope) { @('--scope', $Scope) } else { @('--resource', $Resource) }
-    if ($Tenant) { $arguments += @('--tenant', $Tenant) }
+    if ($Subscription) { $arguments += @('--subscription', $Subscription) }
+    elseif ($Tenant) { $arguments += @('--tenant', $Tenant) }
     $previous = $env:AZURE_CONFIG_DIR
     try {
         if ($ConfigDirectory) { $env:AZURE_CONFIG_DIR = $ConfigDirectory }

@@ -19,7 +19,7 @@ param(
     [string] $Subscription,
     # The studio's infra/main.bicep deployment; defaults to the newest one with its outputs.
     [string] $Deployment,
-    # A tenant your Azure CLI can sign in to, for the wrong-tenant token.
+    # A tenant where any account in your Azure CLI is signed in, for the wrong-tenant token.
     [string] $OtherTenant,
     # An AZURE_CONFIG_DIR where a non-administrator member of the studio tenant is signed in.
     [string] $MemberConfigDirectory,
@@ -104,7 +104,13 @@ $ownerId = if ($ownerToken) { (Get-TokenClaim $ownerToken).oid } else { '' }
 $expiringToken = if ($WaitForTokenExpiry) { $ownerToken } else { '' }
 $wrongAudience = Get-OptionalToken 'wrong-audience' { Get-AccessToken -Resource 'https://management.azure.com/' -Tenant $tenant }
 $wrongTenant = if ($OtherTenant) {
-    Get-OptionalToken 'wrong-tenant' { Get-AccessToken -Resource 'https://management.azure.com/' -Tenant $OtherTenant }
+    Get-OptionalToken 'wrong-tenant' {
+        # --tenant asks with the default account, which may not exist in that tenant; a cached
+        # subscription there selects an account that does.
+        $others = @(Invoke-AzJson account list --all --query "[?tenantId=='$OtherTenant'].id")
+        if ($others) { Get-AccessToken -Resource 'https://management.azure.com/' -Subscription $others[0] }
+        else { Get-AccessToken -Resource 'https://management.azure.com/' -Tenant $OtherTenant }
+    }
 } else { '' }
 $memberToken = if ($MemberConfigDirectory) {
     Get-OptionalToken 'member' { Get-AccessToken -Scope $scope -Tenant $tenant -ConfigDirectory $MemberConfigDirectory }
