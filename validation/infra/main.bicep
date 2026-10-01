@@ -9,14 +9,15 @@ param location string
 @description('Signed-in operator object ID (AZURE_PRINCIPAL_ID); the first administrator in every database.')
 param principalId string
 @description('Validation SPA and API registrations. The preprovision hook creates them unless supplied.')
-param spaAppId string
-param apiAppId string
+param spaAppId string = ''
+param apiAppId string = ''
+// The preprovision hook sets the values below; empty defaults keep azd from asking for them first.
 @description('Images by digest in this environment\'s registry. The preprovision hook imports or builds them.')
-param apiImage string
-param workerImage string
-param validationImage string
+param apiImage string = ''
+param workerImage string = ''
+param validationImage string = ''
 @description('Use the DNS zone returned by the Scheduler privateLinkResources metadata.')
-param schedulerPrivateDnsZoneName string
+param schedulerPrivateDnsZoneName string = ''
 @description('Model capacity units for this environment. Confirm subscription quota for the SKU and region.')
 param planningModelCapacity string = '20'
 @description('Comma-separated fault scenarios to deploy.')
