@@ -347,6 +347,7 @@ resource restartJob 'Microsoft.App/jobs@2024-03-01' = if (restartOn) {
           { name: 'GT_TEST_SCHEDULER_EMULATOR', value: 'false' }
           { name: 'GT_TEST_SCHEDULER_TASKHUB', value: 'restart-test' }
           { name: 'GT_TEST_RESTART_TIMEOUT', value: '600' }
+          { name: 'GT_TEST_REQUIRE_PASS', value: 'true' }
           { name: 'PYTHONUNBUFFERED', value: '1' }
         ]
       }]

@@ -12,7 +12,9 @@ evidence under .acceptance/validation/. See docs/live-acceptance.md.
 pwsh ./validation/scripts/Invoke-ValidationScenario.ps1
 
 .EXAMPLE
-pwsh ./validation/scripts/Invoke-ValidationScenario.ps1 -Scenario sql-outage, blob-outage
+./validation/scripts/Invoke-ValidationScenario.ps1 -Scenario sql-outage, blob-outage
+
+Pass several scenarios from a PowerShell prompt; `pwsh -File` does not parse lists.
 #>
 [CmdletBinding()]
 param(

@@ -94,6 +94,7 @@ resource dependencyProbe 'Microsoft.App/jobs@2024-03-01' = {
           { name: 'GT_FOUNDRY_PROJECT_ENDPOINT', value: foundryProjectEndpoint }
           { name: 'GT_MODEL_DEPLOYMENT', value: modelDeployment }
           { name: 'GT_TEST_AZURE_DEPENDENCIES', value: 'true' }
+          { name: 'GT_TEST_REQUIRE_PASS', value: 'true' }
           { name: 'PYTHONUNBUFFERED', value: '1' }
         ]
       }]
@@ -129,6 +130,7 @@ resource blobProbe 'Microsoft.App/jobs@2024-03-01' = {
           { name: 'GT_BLOB_URL', value: storage.properties.primaryEndpoints.blob }
           { name: 'GT_BLOB_CONTAINER', value: 'assets' }
           { name: 'GT_TEST_AZURE_DEPENDENCIES', value: 'true' }
+          { name: 'GT_TEST_REQUIRE_PASS', value: 'true' }
           { name: 'PYTHONUNBUFFERED', value: '1' }
         ]
       }]

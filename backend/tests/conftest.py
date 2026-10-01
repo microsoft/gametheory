@@ -16,6 +16,20 @@ from gametheory.config import get_settings
 from gametheory.persistence import Administrator, Organization, get_db
 
 
+def pytest_sessionfinish(session, exitstatus):
+    # Live jobs set GT_TEST_REQUIRE_PASS so that their status alone proves the selected tests ran.
+    if os.environ.get("GT_TEST_REQUIRE_PASS", "").lower() != "true" or exitstatus != 0:
+        return
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    stats = reporter.stats if reporter else {}
+    if stats.get("skipped") or not stats.get("passed"):
+        if reporter:
+            reporter.write_line(
+                "\nGT_TEST_REQUIRE_PASS: a selected test was skipped or none passed"
+            )
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
 @pytest.fixture(scope="session")
 def sql_factory():
     url = os.environ.get("GT_TEST_SQL_URL")
