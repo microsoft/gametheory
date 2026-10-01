@@ -12,7 +12,7 @@ dependencies = [
   "pyodbc>=5.2,<6",
   "azure-identity>=1.24,<2",
   "azure-storage-blob>=12.26,<13",
-  "PyJWT[crypto]>=2.10,<3",
+  "PyJWT[crypto]>=2.15,<3",
   "python-multipart>=0.0.20",
   "httpx>=0.28,<1",
   "agent-framework-core==1.18.0",
@@ -26,7 +26,7 @@ gametheory-worker = "gametheory.worker:main"
 gametheory-executor = "gametheory.execution_worker:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "httpx>=0.28,<1", "ruff>=0.12", "mypy>=1.17"]
+dev = ["pytest>=9.0.3,<10", "httpx>=0.28,<1", "ruff>=0.12", "mypy>=1.17"]
 
 [build-system]
 requires = ["hatchling"]
