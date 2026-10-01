@@ -368,8 +368,15 @@ function Publish-SourceImage {
         # --no-logs waits without streaming: on Windows the CLI can crash encoding build logs
         # for a redirected console. Success is judged by the pushed image.
         Write-Host "Building $Target in $Registry with ACR Tasks"
-        $run = Invoke-AzJson acr build --registry $Registry --image "${Repository}:$Tag" --target $Target `
-            --file Dockerfile $root --no-logs
+        # The CLI resolves --file from the working directory, so build from the repository root.
+        Push-Location $root
+        try {
+            $run = Invoke-AzJson acr build --registry $Registry --image "${Repository}:$Tag" --target $Target `
+                --file Dockerfile . --no-logs
+        }
+        finally {
+            Pop-Location
+        }
         $status = if ($run -and $run.PSObject.Properties['status']) { $run.status } else { 'Unknown' }
         $digest = & az acr repository show --name $Registry --image "${Repository}:$Tag" --query digest --output tsv --only-show-errors 2>$null
         if ($LASTEXITCODE -ne 0 -or -not $digest) {
