@@ -15,8 +15,9 @@ targets, or sending email.
 Code for pilot build steps 2 through 4 is complete and proven in CI with real SQL
 Server, the Scheduler emulator, and the isolated HTTPS lab. Step 1's resource and
 policy decisions remain open, and nothing has run against live targets yet. The
-studio runs in a new commercial tenant with planning on; its live acceptance is in
-progress (P1), with repeatable tooling for every check (N7). The executor's
+studio runs in a new commercial tenant with planning on. Its scripted live acceptance
+checks and fault scenarios pass (N7); browser sign-in, a two-account isolation check,
+and an in-studio proposal review remain (P1). The executor's
 prerequisites are deployed there, but execution stays disabled until approved targets
 exist (P2, P3).
 
@@ -105,28 +106,37 @@ and the [run-check assistant rollout](deployment.md#run-check-assistant-rollout)
 
 A11: from inside the application network, the deployed model returned schema-valid
 planning proposals, each adding an objective with a success criterion, on 2026-09-30
-and again on 2026-10-01 (runbook check S6). A proposal that is reviewed and applied in
-the studio (check A) is still required. The run-check assistant is off, so no
-suggestion is needed yet.
+and again on 2026-10-01 (runbook check S6). On 2026-10-01 the studio runner also
+requested a real proposal through the API and applied it as a new draft version (S3).
+A proposal reviewed and applied in the studio UI (check A) is still required. The
+run-check assistant is off, so no suggestion is needed yet.
 
 A12: the [live acceptance runbook](live-acceptance.md) scripts every check, and its
 [validation environment](live-acceptance.md#validation-environment) runs the fault
 scenarios in a separate resource group. Results on 2026-10-01:
 
-- Passed: private DNS for SQL, Blob, Scheduler, and Foundry, a real proposal, and a
-  managed Scheduler activity (S6); a private Blob round trip (S7); and rejection of
-  missing, malformed, and wrong-audience tokens (part of S2).
-- The worker-restart job (F1) succeeded against a managed Scheduler. It ran before a
-  skipped test could fail a job, so a rerun must confirm it.
-- The web app's console, HTTP, and platform logs now reach Log Analytics, which S8 reads.
+- Passed in the studio:
+  - S2: missing, malformed, wrong-audience, wrong-tenant, and expired tokens are
+    refused.
+  - S3: authoring, conditional saves, publication, private assets, idempotent planning,
+    and an applied proposal, which also proves SQL access by the runtime identities.
+  - S5: records, revisions, and asset content persist across an application restart.
+  - S6 and S7: private DNS for SQL, Blob, Scheduler, and Foundry, a real proposal, a
+    managed Scheduler activity, and a private Blob round trip.
+  - S8: the worker log names the planning orchestration instance, the API's console
+    and HTTP logs record the run, and no application log contains prompt text, asset
+    content, or anything token-shaped.
+- Passed in the validation environment: F0 through F5. The probe and worker-restart
+  jobs now fail if a selected test is skipped.
 - Fixed: `infra/main.bicep` could not create a new web app (App Service preflight
   failed), and the Consumption Scheduler task hub limit blocked the probe hub, which
   moved to `infra/probes.bicep`.
-- Open: sign-in (S1), authoring and the reviewed proposal, which exercise SQL access by
-  the runtime identities (S3 and A), workspace isolation (S4), persistence across a
-  restart (S5), log correlation (S8), the wrong-tenant denial, and F0 and F2 through F5.
-  These need an owner token, so Azure CLI must first be preauthorized on the API
-  registration, which needs an interactive sign-in.
+- Open: S1 (browser sign-in, and refusal of an account from another tenant), S4 (a
+  second, non-administrator account in the studio tenant), and check A.
+
+Azure CLI is now preauthorized on the studio's API registration so the runners can get
+user tokens; `Grant-AzureCliAccess.ps1 -Remove` undoes it. The validation environment
+stays deployed for repeat runs; `azd down --purge` in `validation/` removes it.
 
 ### P2: Deployable executor
 
