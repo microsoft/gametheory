@@ -1,6 +1,6 @@
 # Roadmap and current status
 
-Status as of 2026-09-30, with `main` at `b77c270`. Update this file in the pull
+Status as of 2026-09-30, with `main` at `11fd823`. Update this file in the pull
 request that changes an item's status.
 
 This roadmap sequences the work described in the
@@ -57,10 +57,12 @@ through P4.
 
 ### P0: Repository health (now)
 
-- Answer #4, the GitHub inside Microsoft migration notice, with `optin` or
-  `optout`. Only a repository admin can respond. An unanswered repository is
-  archived automatically, which would block pull requests and deployments.
-- Resolve #1 (missing LICENSE) consistently with the #4 decision.
+- Publish the repository as open source. The owner answered #4, the GitHub inside
+  Microsoft migration notice, with `optout --reason staging`, so the repository will
+  not be archived or migrated. Request the public release through Microsoft's
+  open-source portal; the visibility changes only after that release review approves
+  it. The standard Microsoft MIT license, code of conduct, support policy, and
+  README contribution and trademark sections are in place, which resolves #1.
 - Triage the open Dependabot updates: #6 (react-router) and #8 (vitest) for the
   studio, #18 (brace-expansion), #19 (@grpc/grpc-js), and #20 (moment) in the
   studio's root lockfile, and #11 (vitest), #12 (vite), and #13 (Playwright) for the
@@ -68,10 +70,10 @@ through P4.
 
 ### P1: Studio in the new commercial tenant (in progress)
 
-The studio is deployed in a new commercial tenant in North Central US
-(`rg-gametheory-ncus`). The previous tenant's West US 3 validation environment, unused
-since 2026-09-23, was retired on 2026-09-30: its resource group and its two app
-registrations were deleted, and the registrations stay recoverable for 30 days.
+The studio is deployed in a new commercial tenant in North Central US. The previous
+tenant's West US 3 validation environment, unused since 2026-09-23, was retired on
+2026-09-30: its resource group and its two app registrations were deleted, and the
+registrations stay recoverable for 30 days.
 Steps 1 through 4 are complete: planning is on, and the run-check assistant and
 execution are off. The planning model is GPT-5.6-luna. GPT-6-luna returned HTTP 500
 from the Foundry project Responses API that the planner calls; see the
@@ -113,7 +115,7 @@ identities, `test_live_api.py`, and the rest of the checklist are open.
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
 | N4†  | Add the executor to `infra/` behind flags that default off: its own managed identity, a separate execution task hub with a task-hub-scoped grant, the Container App, a read-only bindings-file mount from a private share, and matching non-secret API settings. Document `database-grants --executor-client-id`. `enableExecution` defaults to false; turning it on needs the separate deployment approval. | Prerequisites deployed; execution off |
 
-The owner approved deploying N4 on 2026-09-30. `rg-gametheory-ncus` was redeployed
+The owner approved deploying N4 on 2026-09-30. The studio deployment was redeployed
 from `b77c270` with `deployExecutor=true`. The executor identity, the `exercises` task
 hub and its grant, and the private `execution-bindings` share now exist.
 `gametheory database-grants --executor-client-id` ran, and the image
@@ -122,9 +124,9 @@ hub and its grant, and the private `execution-bindings` share now exist.
 - Approve the target identities and publish the reviewed bindings file. Both need
   the flood lab in Azure (N5, A13).
 - Exempt the bindings storage account from the `StorageAccountDisableLocalAuth`
-  policy in the tenant's `MCAPSGovDeployPolicies` initiative, then turn shared-key
-  access back on. That Modify policy turned it off when the account was created,
-  and the mounts fail without it.
+  policy in the tenant's governance initiative, then turn shared-key access back
+  on. That Modify policy turned it off when the account was created, and the mounts
+  fail without it.
 
 Target identities are never attached to the API or the planning worker.
 
