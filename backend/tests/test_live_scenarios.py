@@ -36,7 +36,9 @@ def scenario(variable: str) -> httpx.Client:
         pytest.skip(f"{variable} is not set")
     assert url.startswith("https://")
     token = os.environ["GT_SCENARIO_TOKEN"]
-    return httpx.Client(base_url=url, headers={"Authorization": "Bearer " + token}, timeout=60)
+    # Storage SDK retries hold a Blob-outage 503 for about 85 seconds; ingress allows 240.
+    timeout = httpx.Timeout(60, read=180)
+    return httpx.Client(base_url=url, headers={"Authorization": "Bearer " + token}, timeout=timeout)
 
 
 def phase(name: str) -> None:

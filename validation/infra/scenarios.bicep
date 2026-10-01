@@ -15,7 +15,8 @@ param validationImage string
 param registryName string
 param containerEnvironmentId string
 param sqlServerName string
-param schedulerName string
+param privateSubnetId string
+param schedulerPrivateDnsZoneName string
 param blobUrl string
 param foundryEndpoint string
 param modelDeployment string
@@ -30,19 +31,16 @@ var blobOn = contains(scenarios, 'blob-outage')
 var schedulerOn = contains(scenarios, 'scheduler-outage')
 var modelOn = contains(scenarios, 'model-denied')
 // Reserved .invalid hosts never resolve, so these faults are deterministic and reach nothing real.
-var faultBlobUrl = 'https://storage-unavailable.invalid/'
-var faultSchedulerEndpoint = 'https://scheduler-unavailable.invalid'
+var unreachableBlobUrl = 'https://storage-unavailable.invalid/'
+var unreachableSchedulerEndpoint = 'https://scheduler-unavailable.invalid'
+var suffix = uniqueString(resourceGroup().id)
 var acrPull = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
-var durableTaskContributor = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0ad04412-c4d5-4796-b79c-f76d14c8d402')
 
 resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' existing = {
   name: registryName
 }
 resource sql 'Microsoft.Sql/servers@2023-08-01' existing = {
   name: sqlServerName
-}
-resource scheduler 'Microsoft.DurableTask/schedulers@2026-02-01' existing = {
-  name: schedulerName
 }
 resource apiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' existing = {
   name: apiIdentityName
@@ -92,48 +90,32 @@ resource deniedPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (m
     roleDefinitionId: acrPull
   }
 }
-resource restartHub 'Microsoft.DurableTask/schedulers/taskHubs@2026-02-01' = if (restartOn) {
-  parent: scheduler
-  name: 'restart-test'
-  properties: {}
-}
-resource restartHubAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (restartOn) {
-  scope: restartHub
-  name: guid(restartHub.id, operator.id, 'scheduler')
-  properties: {
-    principalId: operator.properties.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: durableTaskContributor
+// Fault and restart hubs live on their own Schedulers, at most two hubs each, so every
+// redeployment passes the Consumption task hub quota check.
+module faultScheduler 'scheduler.bicep' = if (schedulerOn || modelOn) {
+  name: 'fault-scheduler'
+  params: {
+    name: 'dts-gtval-${suffix}-faults'
+    location: location
+    privateSubnetId: privateSubnetId
+    dnsZoneName: schedulerPrivateDnsZoneName
+    hubs: concat(
+      schedulerOn ? [{ name: 'scheduler-outage', principalId: workerIdentity.properties.principalId }] : [],
+      modelOn ? [{ name: 'model-denied', principalId: denied.properties.principalId }] : []
+    )
   }
 }
-resource schedulerOutageHub 'Microsoft.DurableTask/schedulers/taskHubs@2026-02-01' = if (schedulerOn) {
-  parent: scheduler
-  name: 'scheduler-outage'
-  properties: {}
-}
-resource schedulerOutageHubAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (schedulerOn) {
-  scope: schedulerOutageHub
-  name: guid(schedulerOutageHub.id, workerIdentity.id, 'scheduler')
-  properties: {
-    principalId: workerIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: durableTaskContributor
+module restartScheduler 'scheduler.bicep' = if (restartOn) {
+  name: 'restart-scheduler'
+  params: {
+    name: 'dts-gtval-${suffix}-restart'
+    location: location
+    privateSubnetId: privateSubnetId
+    dnsZoneName: schedulerPrivateDnsZoneName
+    hubs: [{ name: 'restart-test', principalId: operator.properties.principalId }]
   }
 }
-resource modelDeniedHub 'Microsoft.DurableTask/schedulers/taskHubs@2026-02-01' = if (modelOn) {
-  parent: scheduler
-  name: 'model-denied'
-  properties: {}
-}
-resource modelDeniedHubAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (modelOn) {
-  scope: modelDeniedHub
-  name: guid(modelDeniedHub.id, denied.id, 'scheduler')
-  properties: {
-    principalId: denied.properties.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: durableTaskContributor
-  }
-}
+var scenarioSchedulerEndpoint = (schedulerOn || modelOn) ? faultScheduler!.outputs.endpoint : ''
 
 var authSettings = [
   { name: 'AZURE_CLOUD', value: 'commercial' }
@@ -194,7 +176,7 @@ module blobOutageApi 'container-app.bicep' = if (blobOn) {
     env: concat(authSettings, [
       { name: 'GT_PLANNING_ENABLED', value: 'false' }
       { name: 'GT_SQL_URL', value: sqlUrl(sqlHost, 'gametheory_blob_outage', apiIdentity.properties.clientId) }
-      { name: 'GT_BLOB_URL', value: faultBlobUrl }
+      { name: 'GT_BLOB_URL', value: unreachableBlobUrl }
     ])
   }
   dependsOn: [databases]
@@ -210,7 +192,7 @@ module schedulerOutageApi 'container-app.bicep' = if (schedulerOn) {
     registryServer: registry.properties.loginServer
     image: apiImage
     api: true
-    env: concat(authSettings, planningSettings(scheduler.properties.endpoint, 'scheduler-outage', foundryEndpoint, modelDeployment), [
+    env: concat(authSettings, planningSettings(scenarioSchedulerEndpoint, 'scheduler-outage', foundryEndpoint, modelDeployment), [
       { name: 'GT_SQL_URL', value: sqlUrl(sqlHost, 'gametheory_scheduler_outage', apiIdentity.properties.clientId) }
       { name: 'GT_BLOB_URL', value: blobUrl }
     ])
@@ -229,10 +211,10 @@ module schedulerOutageWorker 'container-app.bicep' = if (schedulerOn) {
     api: false
     env: concat(
       workerSettings(tenantId, workerIdentity.properties.clientId, sqlUrl(sqlHost, 'gametheory_scheduler_outage', workerIdentity.properties.clientId)),
-      planningSettings(faultSchedulerEndpoint, 'scheduler-outage', foundryEndpoint, modelDeployment)
+      planningSettings(unreachableSchedulerEndpoint, 'scheduler-outage', foundryEndpoint, modelDeployment)
     )
   }
-  dependsOn: [databases, schedulerOutageHubAccess]
+  dependsOn: [databases, faultScheduler]
 }
 // F5: a healthy API and a worker whose identity has no Foundry role.
 module modelDeniedApi 'container-app.bicep' = if (modelOn) {
@@ -245,7 +227,7 @@ module modelDeniedApi 'container-app.bicep' = if (modelOn) {
     registryServer: registry.properties.loginServer
     image: apiImage
     api: true
-    env: concat(authSettings, planningSettings(scheduler.properties.endpoint, 'model-denied', foundryEndpoint, modelDeployment), [
+    env: concat(authSettings, planningSettings(scenarioSchedulerEndpoint, 'model-denied', foundryEndpoint, modelDeployment), [
       { name: 'GT_SQL_URL', value: sqlUrl(sqlHost, 'gametheory_model_denied', apiIdentity.properties.clientId) }
       { name: 'GT_BLOB_URL', value: blobUrl }
     ])
@@ -264,10 +246,10 @@ module modelDeniedWorker 'container-app.bicep' = if (modelOn) {
     api: false
     env: concat(
       workerSettings(tenantId, denied.properties.clientId, sqlUrl(sqlHost, 'gametheory_model_denied', denied.properties.clientId)),
-      planningSettings(scheduler.properties.endpoint, 'model-denied', foundryEndpoint, modelDeployment)
+      planningSettings(scenarioSchedulerEndpoint, 'model-denied', foundryEndpoint, modelDeployment)
     )
   }
-  dependsOn: [databases, deniedPull, modelDeniedHubAccess]
+  dependsOn: [databases, deniedPull]
 }
 
 // Migrates, grants, and bootstraps every database; safe to rerun after each provision.
@@ -360,7 +342,7 @@ resource restartJob 'Microsoft.App/jobs@2024-03-01' = if (restartOn) {
           { name: 'AZURE_CLIENT_ID', value: operator.properties.clientId }
           { name: 'AZURE_CLOUD', value: 'commercial' }
           { name: 'GT_TEST_SQL_URL', value: sqlUrl(sqlHost, 'gametheory_test', operator.properties.clientId) }
-          { name: 'GT_TEST_SCHEDULER_ENDPOINT', value: scheduler.properties.endpoint }
+          { name: 'GT_TEST_SCHEDULER_ENDPOINT', value: restartScheduler!.outputs.endpoint }
           { name: 'GT_TEST_SCHEDULER_EMULATOR', value: 'false' }
           { name: 'GT_TEST_SCHEDULER_TASKHUB', value: 'restart-test' }
           { name: 'GT_TEST_RESTART_TIMEOUT', value: '600' }
@@ -369,7 +351,7 @@ resource restartJob 'Microsoft.App/jobs@2024-03-01' = if (restartOn) {
       }]
     }
   }
-  dependsOn: [databases, operatorPull, restartHubAccess]
+  dependsOn: [databases, operatorPull]
 }
 
 output setupJobName string = setupJob.name
@@ -377,10 +359,10 @@ output restartJobName string = restartOn ? 'test-worker-restart' : ''
 output sqlOutageUrl string = sqlOn ? sqlOutageApi!.outputs.url : ''
 output blobOutageUrl string = blobOn ? blobOutageApi!.outputs.url : ''
 output blobOutageApp string = blobOn ? 'fault-blob-api' : ''
-output faultBlobUrl string = faultBlobUrl
+output faultBlobUrl string = unreachableBlobUrl
 output schedulerOutageUrl string = schedulerOn ? schedulerOutageApi!.outputs.url : ''
 output schedulerOutageWorker string = schedulerOn ? 'fault-scheduler-worker' : ''
-output faultSchedulerEndpoint string = faultSchedulerEndpoint
-output healthySchedulerEndpoint string = scheduler.properties.endpoint
+output faultSchedulerEndpoint string = unreachableSchedulerEndpoint
+output healthySchedulerEndpoint string = scenarioSchedulerEndpoint
 output modelDeniedUrl string = modelOn ? modelDeniedApi!.outputs.url : ''
 output modelDeniedWorker string = modelOn ? 'fault-model-worker' : ''

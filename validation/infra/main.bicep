@@ -56,7 +56,19 @@ module studio '../../infra/main.bicep' = {
     enablePlanning: true
     deployFoundry: true
     planningModelCapacity: int(planningModelCapacity)
-    deployProbeJobs: true
+  }
+}
+module probes '../../infra/probes.bicep' = {
+  scope: group
+  name: 'validation-probes'
+  params: {
+    location: location
+    namePrefix: 'gtval'
+    tenantId: tenant().tenantId
+    sqlServerName: studio.outputs.sqlServerName
+    schedulerName: studio.outputs.schedulerName
+    foundryProjectEndpoint: studio.outputs.foundryEndpoint
+    modelDeployment: studio.outputs.modelDeployment
     validationImage: validationImage
   }
 }
@@ -77,7 +89,8 @@ module faults 'scenarios.bicep' = {
     registryName: studio.outputs.registryName
     containerEnvironmentId: studio.outputs.containerEnvironmentId
     sqlServerName: studio.outputs.sqlServerName
-    schedulerName: studio.outputs.schedulerName
+    privateSubnetId: studio.outputs.privateSubnetId
+    schedulerPrivateDnsZoneName: schedulerPrivateDnsZoneName
     blobUrl: studio.outputs.blobUrl
     foundryEndpoint: studio.outputs.foundryEndpoint
     modelDeployment: studio.outputs.modelDeployment
@@ -94,7 +107,7 @@ output BASELINE_URL string = studio.outputs.webUrl
 output BASELINE_WEB_NAME string = studio.outputs.webName
 output BASELINE_WORKER_NAME string = studio.outputs.workerAppName
 output LOG_ANALYTICS_WORKSPACE_ID string = studio.outputs.logAnalyticsWorkspaceId
-output PROBE_JOB_NAMES array = studio.outputs.probeJobNames
+output PROBE_JOB_NAMES array = probes.outputs.jobNames
 output SETUP_JOB_NAME string = faults.outputs.setupJobName
 output RESTART_JOB_NAME string = faults.outputs.restartJobName
 output SQL_OUTAGE_URL string = faults.outputs.sqlOutageUrl

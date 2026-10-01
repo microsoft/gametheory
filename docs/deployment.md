@@ -21,10 +21,11 @@ Government/custom runtime deployment is deferred.
   the [opt-in executor rollout](#opt-in-executor-rollout).
 - Web app console, HTTP, and platform logs sent to the Log Analytics workspace, beside
   the Container Apps logs.
-- Optional private-network probe jobs, off by default: `deployProbeJobs` with a
-  `validationImage` adds the `validate-dependencies` and `validate-blob` manual jobs and
-  their isolated `validation` task hub. See
-  [partial deployment and private dependency probes](#partial-deployment-and-private-dependency-probes).
+
+A separate template, `infra/probes.bicep`, adds the optional private-network probe jobs
+(`validate-dependencies` and `validate-blob`) and their isolated `validation` task hub to
+a deployed studio. See
+[partial deployment and private dependency probes](#partial-deployment-and-private-dependency-probes).
 
 The first template deployment should set `deployApplications=false`. It creates
 infrastructure/identities but does not start an unconfigured application. Supply
@@ -368,8 +369,9 @@ application administrator bootstrap, and end-to-end authoring remain incomplete.
 
 The `validation` image can run `backend/tests/test_azure_dependencies.py` in a
 manual Container Apps job inside the application network, explicitly enabled by
-`GT_TEST_AZURE_DEPENDENCIES=true`. `deployProbeJobs=true` with `validationImage` set by
-digest creates both jobs below; otherwise, supply the actual service configuration:
+`GT_TEST_AZURE_DEPENDENCIES=true`. `scripts/acceptance/Deploy-ProbeJobs.ps1` publishes
+that image and deploys `infra/probes.bicep`, which creates both jobs below; otherwise,
+supply the actual service configuration:
 
 - Use the worker identity and `-k "not blob"` for private DNS, real Foundry proposal
   validation, and an actual managed Scheduler activity. Use a separate `validation`
@@ -382,3 +384,9 @@ from `GT_SQL_URL`. They are not a substitute for the database-backed
 tests or the full authoring/planning lifecycle. Do not run a continuously active
 planning worker before database setup. Jobs are manual and have no active replica
 after completing.
+
+A Consumption Scheduler allows five task hubs, and deployment validation counts every
+task hub a template declares on top of the hubs that already exist, even when they are
+the same hubs. `infra/main.bicep` declares at most two (`planning`, and `exercises` with
+the executor), and `infra/probes.bicep` declares only `validation`, so each template can
+be redeployed. Do not add task hubs to either template for an existing Scheduler.

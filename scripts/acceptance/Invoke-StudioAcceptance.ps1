@@ -131,6 +131,14 @@ $results.Add((Merge-TestOutcome @($cases | Where-Object Name -EQ 'test_persisted
             'S3' 'Authoring, conditional saves, publication, private assets, idempotent planning, applied proposal'))
 $results.Add((Merge-TestOutcome @($cases | Where-Object Name -EQ 'test_live_workspace_isolation_and_revocation') `
             'S4' 'Non-members see nothing, viewers cannot save, removal revokes access'))
+# A run that never reached the tests (wrong Python, import errors) must fail, not read as skipped.
+$unattributed = @($cases | Where-Object {
+        $_.Outcome -eq 'Failed' -and $_.Name -notlike 'test_live_rejects*' -and $_.Name -notlike 'test_live_token_denials*' -and
+        $_.Name -ne 'test_persisted_authoring_and_reviewed_real_planning' -and $_.Name -ne 'test_live_workspace_isolation_and_revocation'
+    })
+if ($unattributed) {
+    $results.Add((New-CheckResult 'pytest' 'The live API test run' 'Failed' (($unattributed | ForEach-Object { "$($_.Name): $($_.Detail)" }) -join '; ')))
+}
 
 if ($SkipRestart -or -not (Test-Path $artifact)) {
     $results.Add((New-CheckResult 'S5' 'Records persist across an application restart' 'Skipped' 'restart skipped or no S3 artifact'))

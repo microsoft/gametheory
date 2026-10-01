@@ -219,7 +219,8 @@ function Set-ContainerAppSetting {
         [Parameter(Mandatory)] [hashtable] $Settings,
         [switch] $RequireRunningReplica
     )
-    $pairs = foreach ($key in $Settings.Keys) { "$key=$($Settings[$key])" }
+    # Always an array: splatting a lone string would pass each character as an argument.
+    $pairs = @(foreach ($key in $Settings.Keys) { "$key=$($Settings[$key])" })
     Invoke-Az containerapp update --resource-group $ResourceGroup --name $Name --set-env-vars @pairs --output none |
         Out-Null
     $deadline = (Get-Date).AddMinutes(10)
@@ -360,10 +361,19 @@ function Publish-SourceImage {
     $digest = & az acr repository show --name $Registry --image "${Repository}:$Tag" --query digest --output tsv --only-show-errors 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $digest) {
         # ACR Tasks resolves --file relative to the uploaded context, which honors .dockerignore.
-        & az acr build --registry $Registry --image "${Repository}:$Tag" --target $Target `
-            --file Dockerfile $root --only-show-errors | Out-Host
-        if ($LASTEXITCODE -ne 0) { throw "Building $Target in $Registry failed" }
-        $digest = Get-AzText acr repository show --name $Registry --image "${Repository}:$Tag" --query digest
+        # UTF-8 output keeps the CLI from crashing while it streams build logs to a redirected
+        # console; success is judged by the pushed image, not by the log stream.
+        $previousEncoding = $env:PYTHONIOENCODING
+        $env:PYTHONIOENCODING = 'utf-8'
+        try {
+            & az acr build --registry $Registry --image "${Repository}:$Tag" --target $Target `
+                --file Dockerfile $root --only-show-errors | Out-Host
+        }
+        finally {
+            $env:PYTHONIOENCODING = $previousEncoding
+        }
+        $digest = & az acr repository show --name $Registry --image "${Repository}:$Tag" --query digest --output tsv --only-show-errors 2>$null
+        if ($LASTEXITCODE -ne 0 -or -not $digest) { throw "Building $Target in $Registry failed" }
     }
     "$server/$Repository@$(($digest | Out-String).Trim())"
 }

@@ -76,24 +76,26 @@ Two targets:
 3. **Optional other tenant for S2.** Any tenant your Azure CLI can sign in to provides
    the wrong-tenant token.
 
-4. **Probe jobs and API logs.** The template sends the web app's console, HTTP, and
-   platform logs to the deployment's Log Analytics workspace. With `deployProbeJobs`, it
-   also adds the `validate-dependencies` and `validate-blob` manual jobs and their
-   isolated `validation` task hub. Publish a validation image to the studio's registry,
-   then redeploy the template with the parameters of its last deployment plus the two
-   new ones:
+4. **API logs.** The main template sends the web app's console, HTTP, and platform logs
+   to the deployment's Log Analytics workspace. For a studio deployed before that
+   change, redeploy `infra/main.bicep` with the parameters of its last deployment. Run
+   `az deployment group what-if` first: expect the diagnostic setting and new outputs,
+   with no change to the web app or worker images. Reattach any governance network
+   security groups right after the redeployment.
+
+5. **Probe jobs.** Publish the validation image to the studio's registry and deploy
+   `infra/probes.bicep`, which adds the `validate-dependencies` and `validate-blob` manual
+   jobs and their isolated `validation` task hub:
 
    ```powershell
-   pwsh ./scripts/acceptance/Publish-ValidationImage.ps1 -Registry <registry-name>
-   # Prints <registry>.azurecr.io/gametheory-validation@sha256:...
+   pwsh ./scripts/acceptance/Deploy-ProbeJobs.ps1 -ResourceGroup <studio-resource-group>
    ```
 
-   Run `az deployment group what-if` first. Expect the diagnostic setting, the task hub
-   and its grant, the two jobs, and new outputs, with no change to the web app or worker
-   images. If earlier probe jobs or a `validation` hub grant were created by hand,
-   delete that hand-made role assignment first; otherwise the template's grant fails
-   as a duplicate. Reattach any governance network security groups right after the
-   redeployment.
+   The probes have their own template because a Consumption Scheduler allows five task
+   hubs, and deployment validation counts each hub a template declares on top of the
+   existing ones. If earlier probe jobs or a `validation` hub grant were created by hand,
+   delete that hand-made role assignment first; otherwise the template's grant fails as
+   a duplicate. The hand-made jobs and hub are adopted in place.
 
 ## Run the studio checks
 
@@ -141,9 +143,12 @@ go to `.acceptance/studio/<timestamp>/`.
 
 - a full studio from `infra/main.bicep` with its own SQL server, storage, Scheduler,
   Foundry project, Container Apps environment, App Service plan, registry, and Log
-  Analytics workspace. It runs the studio's exact API and worker image digests when
-  `STUDIO_RESOURCE_GROUP` is set; otherwise it builds images from your checkout;
-- one long-lived deployment per fault, each with its own database and task hub:
+  Analytics workspace, plus its probe jobs from `infra/probes.bicep`. It runs the
+  studio's exact API and worker image digests when `STUDIO_RESOURCE_GROUP` is set;
+  otherwise it builds images from your checkout;
+- one long-lived deployment per fault, each with its own database and task hub. The
+  fault hubs live on two more private Schedulers, with at most two hubs on each, so
+  every `azd provision` passes the Consumption task hub check:
 
   | Scenario           | Deployments                                                        | Deliberate fault                                 |
   | ------------------ | ------------------------------------------------------------------ | ------------------------------------------------ |
@@ -172,14 +177,15 @@ azd env set STUDIO_RESOURCE_GROUP <studio-resource-group>   # optional; see belo
 azd up
 ```
 
-| Setting                        | Purpose                                                                                       |
-| ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `STUDIO_RESOURCE_GROUP`        | Import the studio's running image digests, and read its Scheduler private DNS zone name       |
-| `STUDIO_SUBSCRIPTION_ID`       | The studio's subscription, when it differs from the validation environment's                  |
-| `SCHEDULER_PRIVATE_DNS_ZONE`   | Required without `STUDIO_RESOURCE_GROUP`; take it from the Scheduler's private link metadata  |
-| `PLANNING_MODEL_CAPACITY`      | Model capacity units (default 20). Check quota; a different subscription keeps quota separate |
-| `VALIDATION_SCENARIOS`         | Comma-separated subset of the scenarios above (default: all)                                  |
-| `VALIDATION_ORGANIZATION_NAME` | Organization name bootstrapped into each database                                             |
+| Setting                                          | Purpose                                                                                                                          |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `STUDIO_RESOURCE_GROUP`                          | Import the studio's running image digests, and read its Scheduler private DNS zone name                                          |
+| `STUDIO_SUBSCRIPTION_ID`                         | The studio's subscription, when it differs from the validation environment's                                                     |
+| `SCHEDULER_PRIVATE_DNS_ZONE`                     | Required without `STUDIO_RESOURCE_GROUP`; take it from the Scheduler's private link metadata                                     |
+| `PLANNING_MODEL_CAPACITY`                        | Model capacity units (default 20). Check quota; a different subscription keeps quota separate                                    |
+| `VALIDATION_SCENARIOS`                           | Comma-separated subset of the scenarios above (default: all)                                                                     |
+| `VALIDATION_ORGANIZATION_NAME`                   | Organization name bootstrapped into each database                                                                                |
+| `VALIDATION_API_APP_ID`, `VALIDATION_SPA_APP_ID` | Existing registrations to use instead of dedicated ones; their redirect URIs and Azure CLI preauthorization stay yours to manage |
 
 The hooks are PowerShell and safe to rerun:
 
@@ -249,7 +255,8 @@ and quota.
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `TokenCreatedWithOutdatedPolicies` from Graph         | Continuous access evaluation wants a fresh sign-in: run `az login` again                       |
 | `AADSTS65001` when getting an API token               | Azure CLI is not preauthorized for that API registration; run `Grant-AzureCliAccess.ps1`       |
-| `RoleAssignmentExists` during the studio redeployment | A hand-made `validation` hub grant exists; delete it, then redeploy                            |
+| `RoleAssignmentExists` when deploying the probe jobs  | A hand-made `validation` hub grant exists; delete it, then deploy again                        |
+| `QuotaExceeded` for a task hub                        | A template declares too many hubs for its Consumption Scheduler; see the deployment notes      |
 | Subnets lost their network security groups            | Redeployments detach governance-attached groups; reattach them                                 |
 | `InsufficientQuota` for the model                     | Lower `PLANNING_MODEL_CAPACITY` or use a subscription with separate quota                      |
 | `ManagedEnvironmentCapacityHeavyUsageError`           | Choose another approved region for the validation environment                                  |

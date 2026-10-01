@@ -130,12 +130,14 @@ if (-not (Get-EnvValue 'SCHEDULER_PRIVATE_DNS_ZONE')) {
 }
 
 $apiAppId = Get-EnvValue 'VALIDATION_API_APP_ID'
-$exists = $false
-if ($apiAppId) {
+$managed = (Get-EnvValue 'VALIDATION_REGISTRATIONS_MANAGED') -eq 'true'
+$create = -not $apiAppId
+if ($apiAppId -and $managed) {
+    # Recreate hook-created registrations that were deleted; supplied IDs are used as given.
     & az ad app show --id $apiAppId --query appId --output tsv --only-show-errors 2>$null | Out-Null
-    $exists = $LASTEXITCODE -eq 0
+    $create = $LASTEXITCODE -ne 0
 }
-if (-not $exists) {
+if ($create) {
     Write-Host 'Creating dedicated Entra registrations for this environment'
     $created = New-ValidationRegistration "gametheory-validation-$environmentName"
     Set-AzdValue 'VALIDATION_API_APP_ID' $created.Api

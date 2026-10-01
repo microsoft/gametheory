@@ -66,6 +66,7 @@ jobs:
       - name: Compile Bicep
         run: |
           az bicep build --file infra/main.bicep --stdout > /dev/null
+          az bicep build --file infra/probes.bicep --stdout > /dev/null
           az bicep build --file validation/infra/main.bicep --stdout > /dev/null
           az bicep build --file validation/infra/registry.bicep --stdout > /dev/null
       - name: Parse acceptance scripts
