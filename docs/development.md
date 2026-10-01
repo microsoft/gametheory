@@ -169,6 +169,26 @@ for both planning proposals and run-check suggestions.
 Live Entra sign-in, managed identity/RBAC, and Foundry inference require separate
 authorized deployment validation.
 
+## README screenshots
+
+The README images in `docs/images/` come from `e2e/readme-screenshots.spec.ts`, a
+walkthrough of the synthetic Riverwatch flood exercise in the same test-mode harness.
+Its fixture reads the exercise's brief, operation catalogs, and asset checksums from
+`exercises/flood-response/assets`, freezes the browser clock, and answers every API
+request itself; no backend, sign-in, or external system is involved. Refresh the images
+after a visible UI change, then review them before committing:
+
+```bash
+npm run screenshots
+```
+
+The command compares each new capture with the tracked image and rewrites only images
+that visibly changed, so sub-pixel rendering noise does not produce spurious diffs. Fonts
+render differently across operating systems, so regenerating on another platform changes
+every image. `npm run test:e2e` runs the same walkthrough as a regression check but writes
+its images to `test-results/`, leaving the tracked images unchanged. The images show
+fixture data, not live permissions, connectivity, delivery, or execution evidence.
+
 ## Preparation and external exercise systems
 
 Administrator environment settings and the separate opt-in run executor are
