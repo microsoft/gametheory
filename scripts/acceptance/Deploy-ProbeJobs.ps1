@@ -17,7 +17,9 @@ param(
     [Parameter(Mandatory)] [string] $ResourceGroup,
     [string] $Subscription,
     # The studio's infra/main.bicep deployment; defaults to the newest successful one.
-    [string] $Deployment
+    [string] $Deployment,
+    # An already published validation image by digest; skips the build.
+    [string] $ValidationImage
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -58,7 +60,12 @@ if (-not $modelDeployment) {
     else { Get-DeploymentValue $parameters 'modelDeployment' }
 }
 
-$image = Publish-SourceImage -Registry $registryName -Repository 'gametheory-validation' -Target 'validation'
+$image = if ($ValidationImage) {
+    $ValidationImage
+}
+else {
+    Publish-SourceImage -Registry $registryName -Repository 'gametheory-validation' -Target 'validation'
+}
 Write-Host "Validation image: $image"
 Invoke-Az deployment group create --resource-group $ResourceGroup --name acceptance-probes `
     --template-file (Join-Path (Get-RepositoryRoot) 'infra' 'probes.bicep') `

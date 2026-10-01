@@ -332,7 +332,11 @@ function Merge-TestOutcome {
 
 function Write-AcceptanceSummary {
     param([Parameter(Mandatory)] [object[]] $Results, [Parameter(Mandatory)] [string] $EvidenceDirectory)
-    $Results | Format-Table -AutoSize -Wrap Check, Outcome, Description, Detail | Out-Host
+    Write-Host ''
+    foreach ($result in $Results) {
+        Write-Host ('{0,-12} {1,-8} {2}' -f $result.Check, $result.Outcome, $result.Description)
+        if ($result.Detail) { Write-Host ('{0,-21} {1}' -f '', $result.Detail) }
+    }
     $Results | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $EvidenceDirectory 'summary.json') -Encoding utf8NoBOM
     Write-Host "Evidence: $EvidenceDirectory"
     @($Results | Where-Object Outcome -EQ 'Failed').Count -eq 0
@@ -361,19 +365,16 @@ function Publish-SourceImage {
     $digest = & az acr repository show --name $Registry --image "${Repository}:$Tag" --query digest --output tsv --only-show-errors 2>$null
     if ($LASTEXITCODE -ne 0 -or -not $digest) {
         # ACR Tasks resolves --file relative to the uploaded context, which honors .dockerignore.
-        # UTF-8 output keeps the CLI from crashing while it streams build logs to a redirected
-        # console; success is judged by the pushed image, not by the log stream.
-        $previousEncoding = $env:PYTHONIOENCODING
-        $env:PYTHONIOENCODING = 'utf-8'
-        try {
-            & az acr build --registry $Registry --image "${Repository}:$Tag" --target $Target `
-                --file Dockerfile $root --only-show-errors | Out-Host
-        }
-        finally {
-            $env:PYTHONIOENCODING = $previousEncoding
-        }
+        # --no-logs waits without streaming: on Windows the CLI can crash encoding build logs
+        # for a redirected console. Success is judged by the pushed image.
+        Write-Host "Building $Target in $Registry with ACR Tasks"
+        $run = Invoke-AzJson acr build --registry $Registry --image "${Repository}:$Tag" --target $Target `
+            --file Dockerfile $root --no-logs
+        $status = if ($run -and $run.PSObject.Properties['status']) { $run.status } else { 'Unknown' }
         $digest = & az acr repository show --name $Registry --image "${Repository}:$Tag" --query digest --output tsv --only-show-errors 2>$null
-        if ($LASTEXITCODE -ne 0 -or -not $digest) { throw "Building $Target in $Registry failed" }
+        if ($LASTEXITCODE -ne 0 -or -not $digest) {
+            throw "Building $Target ended $status; see az acr task list-runs --registry $Registry"
+        }
     }
     "$server/$Repository@$(($digest | Out-String).Trim())"
 }

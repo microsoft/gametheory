@@ -16,8 +16,8 @@ import jwt
 import pytest
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("GT_LIVE_API_URL") or not os.environ.get("GT_LIVE_API_TOKEN"),
-    reason="A deployed URL and explicitly authorized user token are required",
+    not os.environ.get("GT_LIVE_API_URL"),
+    reason="A deployed studio URL is required",
 )
 
 PLANNING_PROMPT = (
@@ -37,6 +37,13 @@ def live_url() -> str:
     url = os.environ["GT_LIVE_API_URL"].rstrip("/")
     assert url.startswith("https://")
     return url
+
+
+def owner_token() -> str:
+    token = os.environ.get("GT_LIVE_API_TOKEN")
+    if not token:
+        pytest.skip("An explicitly authorized owner token (GT_LIVE_API_TOKEN) is required")
+    return token
 
 
 def api_client(token: str | None = None) -> httpx.Client:
@@ -59,11 +66,12 @@ def unverified_claims(token: str) -> dict[str, Any]:
 
 
 def test_persisted_authoring_and_reviewed_real_planning():
+    token = owner_token()
     url = os.environ["GT_LIVE_API_URL"].rstrip("/")
     assert url.startswith("https://")
     with httpx.Client(
         base_url=url,
-        headers={"Authorization": "Bearer " + os.environ["GT_LIVE_API_TOKEN"]},
+        headers={"Authorization": "Bearer " + token},
         timeout=60,
     ) as api:
 
@@ -253,7 +261,7 @@ def test_live_workspace_isolation_and_revocation():
     member_token = os.environ.get("GT_LIVE_API_MEMBER_TOKEN")
     if not member_token:
         pytest.skip("GT_LIVE_API_MEMBER_TOKEN is not set (a non-administrator member)")
-    with api_client(os.environ["GT_LIVE_API_TOKEN"]) as owner, api_client(member_token) as member:
+    with api_client(owner_token()) as owner, api_client(member_token) as member:
         me = expect(member, "GET", "/me").json()
         assert not me["organization_admin"], "Use a member who is not an administrator"
         if os.environ.get("GT_LIVE_API_MEMBER_USER"):
@@ -291,7 +299,7 @@ def test_live_records_persist_after_restart():
     if not artifact:
         pytest.skip("GT_LIVE_API_VERIFY_ARTIFACT is not set (an artifact from an earlier run)")
     record = json.loads(Path(artifact).read_text())
-    with api_client(os.environ["GT_LIVE_API_TOKEN"]) as owner:
+    with api_client(owner_token()) as owner:
         base = f"/workspaces/{record['workspace_id']}"
         path = f"{base}/scenarios/{record['scenario_id']}"
         scenario = expect(owner, "GET", path)

@@ -87,13 +87,27 @@ $webUrl = 'https://' + (Get-AzText webapp show --resource-group $ResourceGroup -
 $config = Invoke-RestMethod -Uri "$webUrl/api/config"
 $scope = $config.auth.scope
 $tenant = ($config.auth.authority.TrimEnd('/') -split '/')[-1]
-$ownerToken = Get-AccessToken -Scope $scope -Tenant $tenant
-$owner = Get-TokenClaim $ownerToken
+
+function Get-OptionalToken([string] $Purpose, [scriptblock] $Acquire) {
+    # A missing optional token skips its checks instead of ending the run.
+    try { & $Acquire }
+    catch {
+        Write-Warning "No $Purpose token ($($_.Exception.Message)); its checks will be skipped."
+        ''
+    }
+}
+$ownerToken = Get-OptionalToken 'owner' { Get-AccessToken -Scope $scope -Tenant $tenant }
+if (-not $ownerToken) {
+    Write-Warning 'Preauthorize Azure CLI with Grant-AzureCliAccess.ps1 to run S3-S5 and S8.'
+}
+$ownerId = if ($ownerToken) { (Get-TokenClaim $ownerToken).oid } else { '' }
 $expiringToken = if ($WaitForTokenExpiry) { $ownerToken } else { '' }
-$wrongAudience = Get-AccessToken -Resource 'https://management.azure.com/' -Tenant $tenant
-$wrongTenant = if ($OtherTenant) { Get-AccessToken -Resource 'https://management.azure.com/' -Tenant $OtherTenant } else { '' }
+$wrongAudience = Get-OptionalToken 'wrong-audience' { Get-AccessToken -Resource 'https://management.azure.com/' -Tenant $tenant }
+$wrongTenant = if ($OtherTenant) {
+    Get-OptionalToken 'wrong-tenant' { Get-AccessToken -Resource 'https://management.azure.com/' -Tenant $OtherTenant }
+} else { '' }
 $memberToken = if ($MemberConfigDirectory) {
-    Get-AccessToken -Scope $scope -Tenant $tenant -ConfigDirectory $MemberConfigDirectory
+    Get-OptionalToken 'member' { Get-AccessToken -Scope $scope -Tenant $tenant -ConfigDirectory $MemberConfigDirectory }
 } else { '' }
 
 $evidence = New-EvidenceDirectory 'studio'
@@ -119,7 +133,7 @@ $cases = @(Invoke-AcceptancePytest -Arguments @('tests/test_live_api.py', '-k', 
         -JUnitPath (Join-Path $evidence 'live-api.xml') -Environment @{
         GT_LIVE_API_URL                  = $webUrl
         GT_LIVE_API_TOKEN                = $ownerToken
-        GT_LIVE_API_EXPECTED_USER        = $owner.oid
+        GT_LIVE_API_EXPECTED_USER        = $ownerId
         GT_LIVE_API_ARTIFACT             = $artifact
         GT_LIVE_API_WRONG_AUDIENCE_TOKEN = $wrongAudience
         GT_LIVE_API_WRONG_TENANT_TOKEN   = $wrongTenant
