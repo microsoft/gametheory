@@ -4,6 +4,11 @@ Game Theory helps organizations design realistic exercises, coordinate activity
 across their operational systems, and evaluate outcomes using evidence. Participants
 work in their everyday tools; Game Theory is the scenario-owner control plane.
 
+![The scenario studio with a planning proposal awaiting review beside the synthetic Riverwatch flood exercise plan](docs/images/studio-plan.png)
+
+_The scenario studio with the synthetic Riverwatch flood exercise. All
+[screenshots](#screenshots) show test fixture data._
+
 ## Purpose
 
 - Create configurable scenarios to test and evaluate responses to complex situations.
@@ -56,6 +61,41 @@ synthetic operational data, an API, a separate response UI, and scenario materia
 It is not part of the Game Theory runtime. Configure its connections and author
 its scenario through the same UI as any other system: there is no starter kit,
 scenario installer, or hidden application seeding path.
+
+## Screenshots
+
+These images walk through the synthetic
+[Riverwatch flood exercise](exercises/flood-response/README.md) in the explicit test-mode
+fixture harness. Every person, place, approval, and result is fictional; nothing shown is
+live tenant data or evidence of live readiness. To regenerate them, see
+[README screenshots](docs/development.md#readme-screenshots).
+
+**Shape the scenario flow.** Steps and branches are planning definitions labeled with
+their bound environment, and the editor generates Mermaid source.
+
+![Scenario flow editor showing the Riverwatch flow from an occupancy inject through acknowledgement to allocation or a single escalation](docs/images/studio-flow.png)
+
+**Bind exact operations.** Each preparation step names a registered operation version,
+its typed parameters, and declared earlier results instead of guessed identifiers.
+
+![Preparation step bound to the shelter.occupancy.update operation, with typed parameters and a reference to an earlier step's result](docs/images/preparation-board.png)
+
+**Describe run checks in plain words.** The opt-in run-check assistant suggests watches
+and goal rules for the frozen preview; nothing reaches the forms until an operator
+chooses it.
+
+![Exercise runs tab with run checks suggested from a plain-language request, each marked valid](docs/images/run-checks.png)
+
+**Judge objectives from evidence.** After a run, each objective is met, unmet, or
+indeterminate according to its recorded evidence.
+
+![Objective assessment with detection and acknowledgement met and allocation unmet](docs/images/run-results.png)
+
+**Set execution policy.** Administrators classify environments and choose whether
+nonproduction runs need approval; production approval is mandatory. Light and dark
+themes are both supported.
+
+![Settings in the dark theme showing the Flood lab environment's execution policy](docs/images/settings-dark.png)
 
 ## Stack
 
