@@ -400,8 +400,8 @@ function Publish-SourceImage {
 
 function Find-BuiltImageDigest {
     # Reads the digest from the newest successful ACR Tasks run that pushed the tag. Run records
-    # come from Azure Resource Manager, so this works without registry data-plane tokens, which
-    # the CLI cannot always obtain (for example after a tenant revokes older sign-in tokens).
+    # come from Azure Resource Manager, so no registry data-plane token is needed; without one,
+    # registry commands stop at an interactive username prompt.
     param(
         [Parameter(Mandatory)] [string] $Registry,
         [Parameter(Mandatory)] [string] $Repository,
