@@ -374,11 +374,11 @@ function Publish-SourceImage {
     }
     $root = Get-RepositoryRoot
     $server = Get-AzText acr show --name $Registry --query loginServer
-    $digest = & az acr repository show --name $Registry --image "${Repository}:$Tag" --query digest --output tsv --only-show-errors 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $digest) {
+    $digest = Find-BuiltImageDigest -Registry $Registry -Repository $Repository -Tag $Tag
+    if (-not $digest) {
         # ACR Tasks resolves --file relative to the uploaded context, which honors .dockerignore.
         # --no-logs waits without streaming: on Windows the CLI can crash encoding build logs
-        # for a redirected console. Success is judged by the pushed image.
+        # for a redirected console. Success is judged by the run's recorded output image.
         Write-Host "Building $Target in $Registry with ACR Tasks"
         # The CLI resolves --file from the working directory, so build from the repository root.
         Push-Location $root
@@ -390,12 +390,28 @@ function Publish-SourceImage {
             Pop-Location
         }
         $status = if ($run -and $run.PSObject.Properties['status']) { $run.status } else { 'Unknown' }
-        $digest = & az acr repository show --name $Registry --image "${Repository}:$Tag" --query digest --output tsv --only-show-errors 2>$null
-        if ($LASTEXITCODE -ne 0 -or -not $digest) {
+        $digest = Find-BuiltImageDigest -Registry $Registry -Repository $Repository -Tag $Tag
+        if ($status -ne 'Succeeded' -or -not $digest) {
             throw "Building $Target ended $status; see az acr task list-runs --registry $Registry"
         }
     }
-    "$server/$Repository@$(($digest | Out-String).Trim())"
+    "$server/$Repository@$digest"
+}
+
+function Find-BuiltImageDigest {
+    # Reads the digest from the newest successful ACR Tasks run that pushed the tag. Run records
+    # come from Azure Resource Manager, so this works without registry data-plane tokens, which
+    # the CLI cannot always obtain (for example after a tenant revokes older sign-in tokens).
+    param(
+        [Parameter(Mandatory)] [string] $Registry,
+        [Parameter(Mandatory)] [string] $Repository,
+        [Parameter(Mandatory)] [string] $Tag
+    )
+    $runs = @(Invoke-AzJson acr task list-runs --registry $Registry --run-status Succeeded --top 100 `
+            --query '[].outputImages')
+    $images = foreach ($outputs in $runs) { foreach ($image in @($outputs)) { if ($image) { $image } } }
+    $images | Where-Object { $_.repository -eq $Repository -and $_.tag -eq $Tag } |
+        Select-Object -First 1 | ForEach-Object digest
 }
 
 Export-ModuleMember -Function Get-RepositoryRoot, Invoke-Az, Invoke-AzJson, Get-AzText, Get-AccessToken,
