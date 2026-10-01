@@ -1,26 +1,77 @@
-"""Explicitly authorized smoke test; creates synthetic records in the deployed app."""
+"""Explicitly authorized smoke tests; they create synthetic records in the deployed app.
+
+Tokens arrive only through environment variables and are never printed or written to disk.
+See docs/live-acceptance.md for how each optional input is obtained.
+"""
 
 import json
 import os
 import time
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import httpx
+import jwt
 import pytest
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("GT_LIVE_API_URL") or not os.environ.get("GT_LIVE_API_TOKEN"),
-    reason="A deployed URL and explicitly authorized user token are required",
+    not os.environ.get("GT_LIVE_API_URL"),
+    reason="A deployed studio URL is required",
 )
+
+PLANNING_PROMPT = (
+    "This is synthetic deployment validation. Refine the narrative to explain "
+    "the existing communications objective. Preserve the title, all object identifiers, "
+    "asset references, and connection/environment bindings. Do not add any external actions."
+)
+ASSET_PAYLOAD = b"exercise,status\nsynthetic,validation\n"
+# Distinctive fragments that must never appear in application logs.
+LOG_MARKERS = [
+    "Refine the narrative to explain the existing communications",
+    "synthetic,validation",
+]
+
+
+def live_url() -> str:
+    url = os.environ["GT_LIVE_API_URL"].rstrip("/")
+    assert url.startswith("https://")
+    return url
+
+
+def owner_token() -> str:
+    token = os.environ.get("GT_LIVE_API_TOKEN")
+    if not token:
+        pytest.skip("An explicitly authorized owner token (GT_LIVE_API_TOKEN) is required")
+    return token
+
+
+def api_client(token: str | None = None) -> httpx.Client:
+    headers = {"Authorization": "Bearer " + token} if token else {}
+    return httpx.Client(base_url=live_url(), headers=headers, timeout=60)
+
+
+def expect(
+    api: httpx.Client, method: str, path: str, status: int = 200, **kwargs: Any
+) -> httpx.Response:
+    response = api.request(method, "/api" + path, **kwargs)
+    assert response.status_code == status, (path, response.status_code, response.text)
+    return response
+
+
+def unverified_claims(token: str) -> dict[str, Any]:
+    # Only confirms which negative case a supplied token represents; never trusted.
+    claims: dict[str, Any] = jwt.decode(token, options={"verify_signature": False})
+    return claims
 
 
 def test_persisted_authoring_and_reviewed_real_planning():
+    token = owner_token()
     url = os.environ["GT_LIVE_API_URL"].rstrip("/")
     assert url.startswith("https://")
     with httpx.Client(
         base_url=url,
-        headers={"Authorization": "Bearer " + os.environ["GT_LIVE_API_TOKEN"]},
+        headers={"Authorization": "Bearer " + token},
         timeout=60,
     ) as api:
 
@@ -57,7 +108,7 @@ def test_persisted_authoring_and_reviewed_real_planning():
                 "description": "Synthetic metadata only. No organizational system is connected.",
             },
         ).json()
-        payload = b"exercise,status\nsynthetic,validation\n"
+        payload = ASSET_PAYLOAD
         asset = call(
             "POST",
             base + "/assets",
@@ -123,9 +174,7 @@ def test_persisted_authoring_and_reviewed_real_planning():
         request_body = {
             "request_id": request_id,
             "base_version": 2,
-            "prompt": "This is synthetic deployment validation. Refine the narrative to explain "
-            "the existing communications objective. Preserve the title, all object identifiers, "
-            "asset references, and connection/environment bindings. Do not add any external actions.",
+            "prompt": PLANNING_PROMPT,
         }
         call("POST", path + "/planning", 202, json=request_body)
         call("POST", path + "/planning", 202, json=request_body)
@@ -157,11 +206,109 @@ def test_persisted_authoring_and_reviewed_real_planning():
                         "workspace_id": workspace["id"],
                         "scenario_id": scenario["id"],
                         "request_id": request_id,
+                        "planning_instance": f"planning-{request_id}",
                         "asset_id": asset["id"],
                         "version": 3,
                         "scenario_url": url + f"/w/{workspace['id']}/s/{scenario['id']}",
+                        "log_markers": LOG_MARKERS,
                     },
                     indent=2,
                 )
                 + "\n"
             )
+
+
+def test_live_rejects_missing_and_malformed_tokens():
+    with api_client() as anonymous:
+        for headers in ({}, {"Authorization": "Bearer not-a-token"}):
+            response = expect(anonymous, "GET", "/me", 401, headers=headers)
+            assert response.headers.get("www-authenticate") == "Bearer"
+
+
+# Each variable holds a real token that the API must refuse for one specific reason.
+DENIED_TOKENS = {
+    "GT_LIVE_API_WRONG_AUDIENCE_TOKEN": "same tenant, another resource",
+    "GT_LIVE_API_WRONG_TENANT_TOKEN": "issued by another tenant",
+    "GT_LIVE_API_EXPIRED_TOKEN": "a studio token whose exp has passed",
+}
+
+
+@pytest.mark.parametrize("variable", list(DENIED_TOKENS))
+def test_live_token_denials(variable):
+    token = os.environ.get(variable)
+    if not token:
+        pytest.skip(f"{variable} is not set ({DENIED_TOKENS[variable]})")
+    with api_client() as anonymous:
+        auth = expect(anonymous, "GET", "/config").json()["auth"]
+        tenant = auth["authority"].rstrip("/").rsplit("/", 1)[-1]
+        resource = auth["scope"].rsplit("/", 1)[0]
+        audiences = {resource, resource.removeprefix("api://")}
+        claims = unverified_claims(token)
+        if variable == "GT_LIVE_API_WRONG_AUDIENCE_TOKEN":
+            assert claims["tid"] == tenant and claims["aud"] not in audiences
+        elif variable == "GT_LIVE_API_WRONG_TENANT_TOKEN":
+            assert claims["tid"] != tenant
+        else:
+            assert claims["tid"] == tenant and claims["aud"] in audiences
+            assert claims["exp"] < time.time(), "The supplied token has not expired yet"
+        response = expect(
+            anonymous, "GET", "/me", 401, headers={"Authorization": "Bearer " + token}
+        )
+        assert response.headers.get("www-authenticate") == "Bearer"
+
+
+def test_live_workspace_isolation_and_revocation():
+    member_token = os.environ.get("GT_LIVE_API_MEMBER_TOKEN")
+    if not member_token:
+        pytest.skip("GT_LIVE_API_MEMBER_TOKEN is not set (a non-administrator member)")
+    with api_client(owner_token()) as owner, api_client(member_token) as member:
+        me = expect(member, "GET", "/me").json()
+        assert not me["organization_admin"], "Use a member who is not an administrator"
+        if os.environ.get("GT_LIVE_API_MEMBER_USER"):
+            assert me["object_id"] == os.environ["GT_LIVE_API_MEMBER_USER"]
+        workspace = expect(
+            owner, "POST", "/workspaces", 201, json={"name": "Isolation validation"}
+        ).json()
+        base = f"/workspaces/{workspace['id']}"
+        scenario = expect(
+            owner, "POST", base + "/scenarios", 201, json={"name": "Synthetic isolation check"}
+        ).json()
+        path = f"{base}/scenarios/{scenario['id']}"
+
+        def listed():
+            workspaces = expect(member, "GET", "/workspaces").json()
+            return any(item["id"] == workspace["id"] for item in workspaces)
+
+        assert not listed()
+        expect(member, "GET", path, 404)
+        expect(member, "GET", base + "/members", 404)
+        expect(
+            owner, "PUT", base + "/members", json={"object_id": me["object_id"], "role": "viewer"}
+        )
+        assert listed()
+        content = expect(member, "GET", path).json()["content"]
+        expect(member, "PUT", path, 403, headers={"If-Match": '"1"'}, json=content)
+        expect(owner, "DELETE", f"{base}/members/{me['object_id']}", 204)
+        assert not listed()
+        expect(member, "GET", path, 404)
+        assert expect(owner, "GET", path).json()["version"] == 1
+
+
+def test_live_records_persist_after_restart():
+    artifact = os.environ.get("GT_LIVE_API_VERIFY_ARTIFACT")
+    if not artifact:
+        pytest.skip("GT_LIVE_API_VERIFY_ARTIFACT is not set (an artifact from an earlier run)")
+    record = json.loads(Path(artifact).read_text())
+    with api_client(owner_token()) as owner:
+        base = f"/workspaces/{record['workspace_id']}"
+        path = f"{base}/scenarios/{record['scenario_id']}"
+        scenario = expect(owner, "GET", path)
+        assert scenario.json()["version"] == record["version"]
+        assert scenario.headers["etag"] == f'"{record["version"]}"'
+        revisions = expect(owner, "GET", path + "/revisions").json()
+        assert any(item["version"] == 2 for item in revisions)
+        content = expect(owner, "GET", f"{base}/assets/{record['asset_id']}/content").content
+        assert content == ASSET_PAYLOAD
+        requests = expect(owner, "GET", path + "/planning").json()
+        request = next(item for item in requests if item["id"] == record["request_id"])
+        assert request["status"] == "applied" and request["proposal"]

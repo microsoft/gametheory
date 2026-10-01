@@ -4,7 +4,10 @@
 .impeccable
 exercises
 .venv-tools
+.venv
 backend/.venv
+.acceptance
+**/.azure
 node_modules
 **/node_modules
 **/__pycache__

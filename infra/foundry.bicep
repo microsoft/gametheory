@@ -7,6 +7,9 @@ param workerPrincipalId string
 param modelSku string = 'DataZoneStandard'
 param modelName string = 'gpt-5.6-luna'
 param modelVersion string = '2026-07-09'
+@description('Model capacity units. Confirm subscription quota for the SKU in the region.')
+@minValue(1)
+param modelCapacity int = 50
 
 resource account 'Microsoft.CognitiveServices/accounts@2025-06-01' = {
   name: name
@@ -36,7 +39,7 @@ resource model 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
   parent: account
   // A deployment cannot change models in place; a new name also avoids stale project routing.
   name: modelName
-  sku: { name: modelSku, capacity: 50 }
+  sku: { name: modelSku, capacity: modelCapacity }
   properties: {
     model: { format: 'OpenAI', name: modelName, version: modelVersion }
     raiPolicyName: 'Microsoft.DefaultV2'

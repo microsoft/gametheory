@@ -1,6 +1,6 @@
 # Roadmap and current status
 
-Status as of 2026-09-30, with `main` at `11fd823`. Update this file in the pull
+Status as of 2026-10-01, with `main` at `77ae853`. Update this file in the pull
 request that changes an item's status.
 
 This roadmap sequences the work described in the
@@ -15,9 +15,11 @@ targets, or sending email.
 Code for pilot build steps 2 through 4 is complete and proven in CI with real SQL
 Server, the Scheduler emulator, and the isolated HTTPS lab. Step 1's resource and
 policy decisions remain open, and nothing has run against live targets yet. The
-studio runs in a new commercial tenant with planning on; its live acceptance is
-open (P1). The executor's prerequisites are deployed there, but execution stays
-disabled until approved targets exist (P2, P3).
+studio runs in a new commercial tenant with planning on. Its scripted live acceptance
+checks and fault scenarios pass (N7); browser sign-in, a two-account isolation check,
+and an in-studio proposal review remain (P1). The executor's
+prerequisites are deployed there, but execution stays disabled until approved targets
+exist (P2, P3).
 
 | Pilot build step ([§8](flood-response-pilot-plan.md#8-build-sequence-and-gates)) | Status                                                                                                                   |
 | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -49,19 +51,19 @@ N1, A1–A10, and F1–F3 are not recorded; do not reuse them.
 | N2   | #15          | Guided run setup, a non-mutating check before creating a run, and a launch checklist                                  |
 | N3   | #16          | Authoritative acknowledgement and allocation milestones for timed objectives                                          |
 | —    | #17          | Opt-in run-check assistant that suggests watches, goal rules, and undo bindings; live model validation is A11         |
+| N7   | #30          | Live acceptance runbook and runners, web app log shipping, probe jobs template, and a disposable fault environment    |
 
 ## Phases
 
 P2 and P3 can proceed alongside P1. P4 needs its own approvals. P5 depends on P1
 through P4.
 
-### P0: Repository health (now)
+### P0: Repository health (done)
 
-- Publish the repository as open source. The owner answered #4, the GitHub inside
-  Microsoft migration notice, with `optout --reason staging`, so the repository will
-  not be archived or migrated. Request the public release through Microsoft's
-  open-source portal; the visibility changes only after that release review approves
-  it. The standard Microsoft MIT license, code of conduct, support policy, and
+- The repository is public as of 2026-10-01, and a `Protect main` ruleset guards the
+  default branch. The owner answered #4, the GitHub inside Microsoft migration
+  notice, with `optout --reason staging`, so the repository will not be archived or
+  migrated. The standard Microsoft MIT license, code of conduct, support policy, and
   README contribution and trademark sections are in place, which resolves #1.
 - Dependabot alerts are resolved. #28 patched every fixable alert and replaced the
   Dependabot pull requests #6 (react-router) and #8 (vitest) for the studio, #18
@@ -71,7 +73,8 @@ through P4.
   PyJWT and pytest in the backend locks, which Dependabot does not read. The uuid
   alert is dismissed as vulnerable code not used: uuid 8 is reachable only through
   the dev-only Azurite emulator, whose callers use uuid v1 and v4, and no patched
-  8.x release exists.
+  8.x release exists. Dependabot and secret scanning showed no open alerts on
+  2026-10-01.
 
 ### P1: Studio in the new commercial tenant (in progress)
 
@@ -101,14 +104,39 @@ and the [run-check assistant rollout](deployment.md#run-check-assistant-rollout)
 | A11  | The deployed model produces a real planning proposal that is reviewed and applied, plus a run-check suggestion if the assistant is enabled | Partial |
 | A12† | The studio [live acceptance](deployment.md#live-acceptance) checklist, including `backend/tests/test_live_api.py`                          | Partial |
 
-A11: from inside the application network, the deployed model returned a schema-valid
-planning proposal with a measurable objective in 5.1 seconds. A proposal that is
-reviewed and applied in the studio is still required. The run-check assistant is off,
-so no suggestion is needed yet.
+A11: from inside the application network, the deployed model returned schema-valid
+planning proposals, each adding an objective with a success criterion, on 2026-09-30
+and again on 2026-10-01 (runbook check S6). On 2026-10-01 the studio runner also
+requested a real proposal through the API and applied it as a new draft version (S3).
+A proposal reviewed and applied in the studio UI (check A) is still required. The
+run-check assistant is off, so no suggestion is needed yet.
 
-A12: private DNS for Blob, Scheduler, and Foundry, a managed Scheduler activity, and a
-private Blob round trip passed. Sign-in, authoring, SQL access by the runtime
-identities, `test_live_api.py`, and the rest of the checklist are open.
+A12: the [live acceptance runbook](live-acceptance.md) scripts every check, and its
+[validation environment](live-acceptance.md#validation-environment) runs the fault
+scenarios in a separate resource group. Results on 2026-10-01:
+
+- Passed in the studio:
+  - S2: missing, malformed, wrong-audience, wrong-tenant, and expired tokens are
+    refused.
+  - S3: authoring, conditional saves, publication, private assets, idempotent planning,
+    and an applied proposal, which also proves SQL access by the runtime identities.
+  - S5: records, revisions, and asset content persist across an application restart.
+  - S6 and S7: private DNS for SQL, Blob, Scheduler, and Foundry, a real proposal, a
+    managed Scheduler activity, and a private Blob round trip.
+  - S8: the worker log names the planning orchestration instance, the API's console
+    and HTTP logs record the run, and no application log contains prompt text, asset
+    content, or anything token-shaped.
+- Passed in the validation environment: F0 through F5. The probe and worker-restart
+  jobs now fail if a selected test is skipped.
+- Fixed: `infra/main.bicep` could not create a new web app (App Service preflight
+  failed), and the Consumption Scheduler task hub limit blocked the probe hub, which
+  moved to `infra/probes.bicep`.
+- Open: S1 (browser sign-in, and refusal of an account from another tenant), S4 (a
+  second, non-administrator account in the studio tenant), and check A.
+
+Azure CLI is now preauthorized on the studio's API registration so the runners can get
+user tokens; `Grant-AzureCliAccess.ps1 -Remove` undoes it. The validation environment
+stays deployed for repeat runs; `azd down --purge` in `validation/` removes it.
 
 ### P2: Deployable executor
 

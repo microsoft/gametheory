@@ -23,6 +23,8 @@ from gametheory.persistence import (
 from gametheory.run_setup import RunCheckContext, RunCheckSuggestion
 
 pytestmark = pytest.mark.integration
+# A managed Scheduler can take longer than the emulator to redeliver abandoned work.
+RESTART_TIMEOUT = float(os.environ.get("GT_TEST_RESTART_TIMEOUT", "180"))
 
 
 def test_worker_crash_resumes_one_persisted_proposal(sql_client, sql_factory, tmp_path):
@@ -71,7 +73,7 @@ def test_worker_crash_resumes_one_persisted_proposal(sql_client, sql_factory, tm
     command = [sys.executable, str(Path(__file__).with_name("emulator_worker.py"))]
     process = subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT)
 
-    def wait_for(status, timeout=180):
+    def wait_for(status, timeout=RESTART_TIMEOUT):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             with sql_factory() as db:
@@ -176,7 +178,7 @@ def test_worker_crash_resumes_one_persisted_run_check_suggestion(sql_client, sql
     command = [sys.executable, str(Path(__file__).with_name("emulator_worker.py"))]
     process = subprocess.Popen(command, env=env, stdout=log, stderr=subprocess.STDOUT)
 
-    def wait_for(status, timeout=180):
+    def wait_for(status, timeout=RESTART_TIMEOUT):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             with sql_factory() as db:

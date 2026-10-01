@@ -52,6 +52,9 @@ param planningModelSku string = 'DataZoneStandard'
 @description('OpenAI model and version for the dedicated Foundry deployment. Confirm the SKU is offered for it in the target region.')
 param planningModelName string = 'gpt-5.6-luna'
 param planningModelVersion string = '2026-07-09'
+@description('Capacity units for the dedicated model deployment. Confirm quota for the SKU in the region.')
+@minValue(1)
+param planningModelCapacity int = 50
 
 var suffix = uniqueString(resourceGroup().id)
 var stem = '${namePrefix}-${suffix}'
@@ -310,6 +313,7 @@ module foundry './foundry.bicep' = if (deployFoundry) {
     modelSku: planningModelSku
     modelName: planningModelName
     modelVersion: planningModelVersion
+    modelCapacity: planningModelCapacity
   }
 }
 var commonSettings = [
@@ -344,7 +348,9 @@ resource web 'Microsoft.Web/sites@2023-12-01' = if (deployApplications) {
     virtualNetworkSubnetId: webSubnet
     // The bindings share has no public endpoint. This routes only the platform's storage-mount
     // traffic through VNet integration; application traffic, including public services, is unchanged.
-    ...(executionOn ? { vnetContentShareEnabled: true } : {})
+    // A plain property, not a spread: a spread makes `properties` one expression, and App Service
+    // preflight then fails with a null reference when it creates a new web app.
+    vnetContentShareEnabled: executionOn
     siteConfig: {
       linuxFxVersion: 'DOCKER|${apiImage}'
       acrUseManagedIdentityCreds: true
@@ -407,6 +413,21 @@ resource worker 'Microsoft.App/containerApps@2024-03-01' = if (deployApplication
   }
   dependsOn: [pullWorker, schedulerAccess, sqlLink, schedulerLink]
 }
+// Keeps API stdout (including failure correlation IDs), request lines, and container lifecycle
+// events in the same workspace as the Container Apps logs.
+resource webLogs 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (deployApplications) {
+  scope: web
+  name: 'application-logs'
+  properties: {
+    workspaceId: computeNetwork.outputs.logAnalyticsWorkspaceId
+    logs: [for category in ['AppServiceConsoleLogs', 'AppServiceHTTPLogs', 'AppServicePlatformLogs']: {
+      category: category
+      enabled: true
+    }]
+  }
+}
+var planningEndpoint = deployFoundry ? foundry!.outputs.projectEndpoint : foundryProjectEndpoint
+var planningDeployment = deployFoundry ? foundry!.outputs.modelDeployment : modelDeployment
 resource containerEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: 'cae-${stem}'
 }
@@ -482,7 +503,7 @@ output workerIdentityClientId string = workerIdentity.properties.clientId
 output containerEnvironmentId string = computeNetwork.outputs.containerEnvironmentId
 output virtualNetworkId string = computeNetwork.outputs.virtualNetworkId
 output plannedWebName string = 'web-${stem}'
-output foundryEndpoint string = deployFoundry ? foundry!.outputs.projectEndpoint : foundryProjectEndpoint
+output foundryEndpoint string = planningEndpoint
 output runAssistantEnabled bool = runAssistantEnabled
 output webUrl string = deployApplications ? 'https://${web!.properties.defaultHostName}' : ''
 output executorIdentityName string = deployExecutor ? executorIdentity.name : ''
@@ -494,3 +515,19 @@ output bindingsShare string = deployExecutor ? bindingsFileShare.name : ''
 output bindingsFile string = deployExecutor ? bindingsFile : ''
 output executionEnabled bool = executionOn
 output executorAppName string = executionOn ? executor.name : ''
+// Names and IDs that acceptance tooling and the validation environment build on.
+output stem string = stem
+output webName string = 'web-${stem}'
+output workerAppName string = deployApplications && enablePlanning ? 'worker-${stem}' : ''
+output appServicePlanId string = plan.id
+output webSubnetId string = webSubnet
+output privateSubnetId string = privateSubnet
+output logAnalyticsWorkspaceId string = computeNetwork.outputs.logAnalyticsWorkspaceId
+output registryName string = registry.name
+output sqlServerName string = sql.name
+output storageAccountName string = storage.name
+output schedulerName string = scheduler.name
+output planningTaskHub string = hub.name
+output apiIdentityId string = apiIdentity.id
+output workerIdentityId string = workerIdentity.id
+output modelDeployment string = planningDeployment

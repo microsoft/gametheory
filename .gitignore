@@ -15,5 +15,7 @@ coverage/
 playwright-report/
 test-results/
 .test-execution/
+.acceptance/
+.azure/
 *.tsbuildinfo
 .DS_Store
