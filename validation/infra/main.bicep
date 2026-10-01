@@ -36,7 +36,28 @@ module identities 'identities.bicep' = {
   name: 'validation-identities'
   params: { location: location }
 }
-// The same template as a real studio, so faults are exercised against identical topology.
+// The same template as a real studio, so faults are exercised against identical topology. It runs
+// twice, as docs/deployment.md prescribes: App Service validates a new web app against its plan,
+// so the first pass creates the platform and the second adds the applications.
+module platform '../../infra/main.bicep' = {
+  scope: group
+  name: 'validation-platform'
+  params: {
+    location: location
+    namePrefix: 'gtval'
+    tenantId: tenant().tenantId
+    spaClientId: spaAppId
+    apiAudience: apiAppId
+    apiScope: 'api://${apiAppId}/access_as_user'
+    sqlAdminId: identities.outputs.operatorClientId
+    sqlAdminName: identities.outputs.operatorName
+    sqlAdminPrincipalType: 'Application'
+    schedulerPrivateDnsZoneName: schedulerPrivateDnsZoneName
+    deployApplications: false
+    deployFoundry: true
+    planningModelCapacity: int(planningModelCapacity)
+  }
+}
 module studio '../../infra/main.bicep' = {
   scope: group
   name: 'validation-studio'
@@ -58,6 +79,7 @@ module studio '../../infra/main.bicep' = {
     deployFoundry: true
     planningModelCapacity: int(planningModelCapacity)
   }
+  dependsOn: [platform]
 }
 module probes '../../infra/probes.bicep' = {
   scope: group

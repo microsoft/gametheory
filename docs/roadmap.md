@@ -1,6 +1,6 @@
 # Roadmap and current status
 
-Status as of 2026-09-30, with `main` at `11fd823`. Update this file in the pull
+Status as of 2026-10-01, with `main` at `77ae853`. Update this file in the pull
 request that changes an item's status.
 
 This roadmap sequences the work described in the
@@ -15,9 +15,10 @@ targets, or sending email.
 Code for pilot build steps 2 through 4 is complete and proven in CI with real SQL
 Server, the Scheduler emulator, and the isolated HTTPS lab. Step 1's resource and
 policy decisions remain open, and nothing has run against live targets yet. The
-studio runs in a new commercial tenant with planning on; its live acceptance is
-open (P1). The executor's prerequisites are deployed there, but execution stays
-disabled until approved targets exist (P2, P3).
+studio runs in a new commercial tenant with planning on; its live acceptance is in
+progress (P1), with repeatable tooling for every check (N7). The executor's
+prerequisites are deployed there, but execution stays disabled until approved targets
+exist (P2, P3).
 
 | Pilot build step ([§8](flood-response-pilot-plan.md#8-build-sequence-and-gates)) | Status                                                                                                                   |
 | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -49,19 +50,19 @@ N1, A1–A10, and F1–F3 are not recorded; do not reuse them.
 | N2   | #15          | Guided run setup, a non-mutating check before creating a run, and a launch checklist                                  |
 | N3   | #16          | Authoritative acknowledgement and allocation milestones for timed objectives                                          |
 | —    | #17          | Opt-in run-check assistant that suggests watches, goal rules, and undo bindings; live model validation is A11         |
+| N7   | #30          | Live acceptance runbook and runners, web app log shipping, probe jobs template, and a disposable fault environment    |
 
 ## Phases
 
 P2 and P3 can proceed alongside P1. P4 needs its own approvals. P5 depends on P1
 through P4.
 
-### P0: Repository health (now)
+### P0: Repository health (done)
 
-- Publish the repository as open source. The owner answered #4, the GitHub inside
-  Microsoft migration notice, with `optout --reason staging`, so the repository will
-  not be archived or migrated. Request the public release through Microsoft's
-  open-source portal; the visibility changes only after that release review approves
-  it. The standard Microsoft MIT license, code of conduct, support policy, and
+- The repository is public as of 2026-10-01, and a `Protect main` ruleset guards the
+  default branch. The owner answered #4, the GitHub inside Microsoft migration
+  notice, with `optout --reason staging`, so the repository will not be archived or
+  migrated. The standard Microsoft MIT license, code of conduct, support policy, and
   README contribution and trademark sections are in place, which resolves #1.
 - Dependabot alerts are resolved. #28 patched every fixable alert and replaced the
   Dependabot pull requests #6 (react-router) and #8 (vitest) for the studio, #18
@@ -71,7 +72,8 @@ through P4.
   PyJWT and pytest in the backend locks, which Dependabot does not read. The uuid
   alert is dismissed as vulnerable code not used: uuid 8 is reachable only through
   the dev-only Azurite emulator, whose callers use uuid v1 and v4, and no patched
-  8.x release exists.
+  8.x release exists. Dependabot and secret scanning showed no open alerts on
+  2026-10-01.
 
 ### P1: Studio in the new commercial tenant (in progress)
 
