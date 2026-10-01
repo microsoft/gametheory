@@ -1,6 +1,6 @@
 # Roadmap and current status
 
-Status as of 2026-09-30, with `main` at `7bc9ba5`. Update this file in the pull
+Status as of 2026-09-30, with `main` at `b77c270`. Update this file in the pull
 request that changes an item's status.
 
 This roadmap sequences the work described in the
@@ -16,8 +16,8 @@ Code for pilot build steps 2 through 4 is complete and proven in CI with real SQ
 Server, the Scheduler emulator, and the isolated HTTPS lab. Step 1's resource and
 policy decisions remain open, and nothing has run against live targets yet. The
 studio runs in a new commercial tenant with planning on; its live acceptance is
-open (P1). Execution stays disabled until an executor deployment and approved
-targets exist (P2, P3).
+open (P1). The executor's prerequisites are deployed there, but execution stays
+disabled until approved targets exist (P2, P3).
 
 | Pilot build step ([§8](flood-response-pilot-plan.md#8-build-sequence-and-gates)) | Status                                                                                                                   |
 | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -69,7 +69,9 @@ through P4.
 ### P1: Studio in the new commercial tenant (in progress)
 
 The studio is deployed in a new commercial tenant in North Central US
-(`rg-gametheory-ncus`); the previous tenant's West US 3 environment is still running.
+(`rg-gametheory-ncus`). The previous tenant's West US 3 validation environment, unused
+since 2026-09-23, was retired on 2026-09-30: its resource group and its two app
+registrations were deleted, and the registrations stay recoverable for 30 days.
 Steps 1 through 4 are complete: planning is on, and the run-check assistant and
 execution are off. The planning model is GPT-5.6-luna. GPT-6-luna returned HTTP 500
 from the Foundry project Responses API that the planner calls; see the
@@ -101,21 +103,30 @@ A12: private DNS for Blob, Scheduler, and Foundry, a managed Scheduler activity,
 private Blob round trip passed. Sign-in, authoring, SQL access by the runtime
 identities, `test_live_api.py`, and the rest of the checklist are open.
 
-Decision for the owner: whether and when to retire the previous tenant's West US 3
-environment after A12 passes.
-
 ### P2: Deployable executor
 
 `infra/main.bicep` includes the executor behind `deployExecutor` and
 `enableExecution`, which default to off; see the
 [opt-in executor rollout](deployment.md#opt-in-executor-rollout).
 
-| Item | Scope                                                                                                                                                                                                                                                                                                                                                                                                        | Status                                 |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- |
-| N4†  | Add the executor to `infra/` behind flags that default off: its own managed identity, a separate execution task hub with a task-hub-scoped grant, the Container App, a read-only bindings-file mount from a private share, and matching non-secret API settings. Document `database-grants --executor-client-id`. `enableExecution` defaults to false; turning it on needs the separate deployment approval. | Template done; deployment not approved |
+| Item | Scope                                                                                                                                                                                                                                                                                                                                                                                                        | Status                                |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| N4†  | Add the executor to `infra/` behind flags that default off: its own managed identity, a separate execution task hub with a task-hub-scoped grant, the Container App, a read-only bindings-file mount from a private share, and matching non-secret API settings. Document `database-grants --executor-client-id`. `enableExecution` defaults to false; turning it on needs the separate deployment approval. | Prerequisites deployed; execution off |
 
-Deploying N4 requires a separate, concrete deployment approval. Target identities
-are never attached to the API or the planning worker.
+The owner approved deploying N4 on 2026-09-30. `rg-gametheory-ncus` was redeployed
+from `b77c270` with `deployExecutor=true`. The executor identity, the `exercises` task
+hub and its grant, and the private `execution-bindings` share now exist.
+`gametheory database-grants --executor-client-id` ran, and the image
+`gametheory-executor:b77c270` is in the registry. Before `enableExecution=true`:
+
+- Approve the target identities and publish the reviewed bindings file. Both need
+  the flood lab in Azure (N5, A13).
+- Exempt the bindings storage account from the `StorageAccountDisableLocalAuth`
+  policy in the tenant's `MCAPSGovDeployPolicies` initiative, then turn shared-key
+  access back on. That Modify policy turned it off when the account was created,
+  and the mounts fail without it.
+
+Target identities are never attached to the API or the planning worker.
 
 ### P3: Flood lab in Azure (Track B, live)
 
