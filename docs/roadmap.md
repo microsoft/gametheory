@@ -63,13 +63,13 @@ through P4.
   open-source portal; the visibility changes only after that release review approves
   it. The standard Microsoft MIT license, code of conduct, support policy, and
   README contribution and trademark sections are in place, which resolves #1.
-- Dependabot alerts are triaged. One consolidated update supersedes the open
+- Dependabot alerts are resolved. #28 patched every fixable alert and replaced the
   Dependabot pull requests #6 (react-router) and #8 (vitest) for the studio, #18
   (brace-expansion), #19 (@grpc/grpc-js), and #20 (moment) in the studio's root
   lockfile, and #11 (vitest), #12 (vite), and #13 (Playwright) for the lab UI. It
-  also patches PyJWT, pip, pytest, and the setuptools build pin in the lab, and
-  PyJWT and pytest in the backend locks, which Dependabot does not read. Dismiss the
-  remaining uuid alert as vulnerable code not used: uuid 8 is reachable only through
+  also patched PyJWT, pip, pytest, and the setuptools build pin in the lab, and
+  PyJWT and pytest in the backend locks, which Dependabot does not read. The uuid
+  alert is dismissed as vulnerable code not used: uuid 8 is reachable only through
   the dev-only Azurite emulator, whose callers use uuid v1 and v4, and no patched
   8.x release exists.
 
