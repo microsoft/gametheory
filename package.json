@@ -9,6 +9,7 @@
     "build": "npm run build -w apps/web",
     "test": "npm run test -w apps/web",
     "test:e2e": "playwright test",
+    "screenshots": "playwright test --config playwright.screenshots.config.ts",
     "contracts": "openapi-typescript backend/openapi.json -o apps/web/src/api.generated.ts"
   },
   "devDependencies": {
