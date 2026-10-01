@@ -64,7 +64,24 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - name: Compile Bicep
-        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+        run: |
+          az bicep build --file infra/main.bicep --stdout > /dev/null
+          az bicep build --file validation/infra/main.bicep --stdout > /dev/null
+          az bicep build --file validation/infra/registry.bicep --stdout > /dev/null
+      - name: Parse acceptance scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($file in Get-ChildItem -Recurse -Include *.ps1, *.psm1 -Path scripts/acceptance, validation) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref] $tokens, [ref] $errors) | Out-Null
+            foreach ($problem in $errors) {
+              Write-Host "::error file=$($file.FullName),line=$($problem.Extent.StartLineNumber)::$($problem.Message)"
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }
       - name: Build application containers
         run: |
           docker build --target api -t gametheory-api:ci .

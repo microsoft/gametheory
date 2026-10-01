@@ -52,6 +52,13 @@ param planningModelSku string = 'DataZoneStandard'
 @description('OpenAI model and version for the dedicated Foundry deployment. Confirm the SKU is offered for it in the target region.')
 param planningModelName string = 'gpt-5.6-luna'
 param planningModelVersion string = '2026-07-09'
+@description('Capacity units for the dedicated model deployment. Confirm quota for the SKU in the region.')
+@minValue(1)
+param planningModelCapacity int = 50
+@description('Add the manual private-network probe jobs and their isolated validation task hub. See docs/live-acceptance.md.')
+param deployProbeJobs bool = false
+@description('Reviewed validation image (Dockerfile validation target) by digest. Required with deployProbeJobs.')
+param validationImage string = ''
 
 var suffix = uniqueString(resourceGroup().id)
 var stem = '${namePrefix}-${suffix}'
@@ -60,6 +67,8 @@ var taskHubName = 'planning'
 // The application refuses to start with the assistant on and planning off.
 var runAssistantEnabled = enablePlanning && enableRunAssistant
 var executionTaskHubName = 'exercises'
+// Probe jobs use this hub only, so a probe orchestration never shares history with planning.
+var validationTaskHubName = 'validation'
 var bindingsMountPath = '/mnt/execution-bindings'
 var bindingsFile = '${bindingsMountPath}/bindings.json'
 // gametheory-executor exits unless execution is enabled, so the app exists only in that state.
@@ -244,6 +253,21 @@ resource executionHubAccess 'Microsoft.Authorization/roleAssignments@2022-04-01'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0ad04412-c4d5-4796-b79c-f76d14c8d402')
   }
 }
+resource validationHub 'Microsoft.DurableTask/schedulers/taskHubs@2026-02-01' = if (deployProbeJobs) {
+  parent: scheduler
+  name: validationTaskHubName
+  properties: {}
+}
+// The dependency probe runs as the worker identity, scoped to the validation hub only.
+resource validationHubAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (deployProbeJobs) {
+  scope: validationHub
+  name: guid(validationHub.id, workerIdentity.id, 'scheduler')
+  properties: {
+    principalId: workerIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0ad04412-c4d5-4796-b79c-f76d14c8d402')
+  }
+}
 module sqlLink './private-link.bicep' = {
   name: 'sql-private-link'
   params: {
@@ -310,6 +334,7 @@ module foundry './foundry.bicep' = if (deployFoundry) {
     modelSku: planningModelSku
     modelName: planningModelName
     modelVersion: planningModelVersion
+    modelCapacity: planningModelCapacity
   }
 }
 var commonSettings = [
@@ -407,6 +432,99 @@ resource worker 'Microsoft.App/containerApps@2024-03-01' = if (deployApplication
   }
   dependsOn: [pullWorker, schedulerAccess, sqlLink, schedulerLink]
 }
+// Keeps API stdout (including failure correlation IDs), request lines, and container lifecycle
+// events in the same workspace as the Container Apps logs.
+resource webLogs 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = if (deployApplications) {
+  scope: web
+  name: 'application-logs'
+  properties: {
+    workspaceId: computeNetwork.outputs.logAnalyticsWorkspaceId
+    logs: [for category in ['AppServiceConsoleLogs', 'AppServiceHTTPLogs', 'AppServicePlatformLogs']: {
+      category: category
+      enabled: true
+    }]
+  }
+}
+var planningEndpoint = deployFoundry ? foundry!.outputs.projectEndpoint : foundryProjectEndpoint
+var planningDeployment = deployFoundry ? foundry!.outputs.modelDeployment : modelDeployment
+var probeArgs = ['-q', '--tb=short', '-p', 'no:cacheprovider', '-rA', 'backend/tests/test_azure_dependencies.py', '-k']
+// Manual probes run the validation image's tests from inside the network, each with the
+// runtime identity whose access it proves. Starting one is an explicit operator action.
+resource dependencyProbe 'Microsoft.App/jobs@2024-03-01' = if (deployProbeJobs) {
+  name: 'validate-dependencies'
+  location: location
+  identity: { type: 'UserAssigned', userAssignedIdentities: { '${workerIdentity.id}': {} } }
+  properties: {
+    environmentId: computeNetwork.outputs.containerEnvironmentId
+    workloadProfileName: 'Consumption'
+    configuration: {
+      triggerType: 'Manual'
+      replicaTimeout: 900
+      replicaRetryLimit: 0
+      manualTriggerConfig: { parallelism: 1, replicaCompletionCount: 1 }
+      registries: [{ server: registry.properties.loginServer, identity: workerIdentity.id }]
+    }
+    template: {
+      containers: [{
+        name: 'job'
+        image: validationImage
+        command: ['pytest']
+        args: concat(probeArgs, ['not blob'])
+        resources: { cpu: 1, memory: '2Gi' }
+        env: [
+          { name: 'AZURE_CLIENT_ID', value: workerIdentity.properties.clientId }
+          { name: 'AZURE_CLOUD', value: 'commercial' }
+          { name: 'GT_TENANT_ID', value: tenantId }
+          { name: 'GT_PLANNING_ENABLED', value: 'true' }
+          { name: 'GT_SQL_URL', value: '${sqlUrlBase}&UID=${workerIdentity.properties.clientId}' }
+          { name: 'GT_BLOB_URL', value: storage.properties.primaryEndpoints.blob }
+          { name: 'GT_SCHEDULER_ENDPOINT', value: scheduler.properties.endpoint }
+          { name: 'GT_SCHEDULER_TASKHUB', value: validationTaskHubName }
+          { name: 'GT_FOUNDRY_PROJECT_ENDPOINT', value: planningEndpoint }
+          { name: 'GT_MODEL_DEPLOYMENT', value: planningDeployment }
+          { name: 'GT_TEST_AZURE_DEPENDENCIES', value: 'true' }
+          { name: 'PYTHONUNBUFFERED', value: '1' }
+        ]
+      }]
+    }
+  }
+  dependsOn: [pullWorker, validationHubAccess, sqlLink, blobLink, schedulerLink]
+}
+resource blobProbe 'Microsoft.App/jobs@2024-03-01' = if (deployProbeJobs) {
+  name: 'validate-blob'
+  location: location
+  identity: { type: 'UserAssigned', userAssignedIdentities: { '${apiIdentity.id}': {} } }
+  properties: {
+    environmentId: computeNetwork.outputs.containerEnvironmentId
+    workloadProfileName: 'Consumption'
+    configuration: {
+      triggerType: 'Manual'
+      replicaTimeout: 600
+      replicaRetryLimit: 0
+      manualTriggerConfig: { parallelism: 1, replicaCompletionCount: 1 }
+      registries: [{ server: registry.properties.loginServer, identity: apiIdentity.id }]
+    }
+    template: {
+      containers: [{
+        name: 'job'
+        image: validationImage
+        command: ['pytest']
+        args: concat(probeArgs, ['blob'])
+        resources: { cpu: 1, memory: '2Gi' }
+        env: [
+          { name: 'AZURE_CLIENT_ID', value: apiIdentity.properties.clientId }
+          { name: 'AZURE_CLOUD', value: 'commercial' }
+          { name: 'GT_TENANT_ID', value: tenantId }
+          { name: 'GT_BLOB_URL', value: storage.properties.primaryEndpoints.blob }
+          { name: 'GT_BLOB_CONTAINER', value: assets.name }
+          { name: 'GT_TEST_AZURE_DEPENDENCIES', value: 'true' }
+          { name: 'PYTHONUNBUFFERED', value: '1' }
+        ]
+      }]
+    }
+  }
+  dependsOn: [pullApi, blobAccess, blobLink]
+}
 resource containerEnvironment 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: 'cae-${stem}'
 }
@@ -494,3 +612,20 @@ output bindingsShare string = deployExecutor ? bindingsFileShare.name : ''
 output bindingsFile string = deployExecutor ? bindingsFile : ''
 output executionEnabled bool = executionOn
 output executorAppName string = executionOn ? executor.name : ''
+// Names and IDs that acceptance tooling and the validation environment build on.
+output stem string = stem
+output webName string = 'web-${stem}'
+output workerAppName string = deployApplications && enablePlanning ? 'worker-${stem}' : ''
+output appServicePlanId string = plan.id
+output webSubnetId string = webSubnet
+output privateSubnetId string = privateSubnet
+output logAnalyticsWorkspaceId string = computeNetwork.outputs.logAnalyticsWorkspaceId
+output registryName string = registry.name
+output sqlServerName string = sql.name
+output storageAccountName string = storage.name
+output schedulerName string = scheduler.name
+output planningTaskHub string = hub.name
+output apiIdentityId string = apiIdentity.id
+output workerIdentityId string = workerIdentity.id
+output modelDeployment string = planningDeployment
+output probeJobNames array = deployProbeJobs ? ['validate-dependencies', 'validate-blob'] : []

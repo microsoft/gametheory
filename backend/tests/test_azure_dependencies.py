@@ -13,6 +13,7 @@ from durabletask import task
 from durabletask.azuremanaged.client import DurableTaskSchedulerClient
 from durabletask.azuremanaged.worker import DurableTaskSchedulerWorker
 from durabletask.client import OrchestrationStatus
+from sqlalchemy.engine import make_url
 
 from gametheory.assets import blob_service, put_blob, read_blob
 from gametheory.config import get_settings
@@ -38,12 +39,18 @@ def dependency_activity_v1(_ctx: task.ActivityContext, value: str) -> str:
 
 def test_private_dns_for_available_services():
     settings = get_settings()
-    for endpoint in (
-        settings.blob_url,
-        settings.scheduler_endpoint,
-        settings.foundry_project_endpoint,
-    ):
-        hostname = urlparse(endpoint).hostname
+    hostnames = [
+        urlparse(endpoint).hostname
+        for endpoint in (
+            settings.blob_url,
+            settings.scheduler_endpoint,
+            settings.foundry_project_endpoint,
+        )
+    ]
+    if settings.sql_url:
+        # Resolves the server name only; this probe never opens a SQL connection.
+        hostnames.append(make_url(settings.sql_url).host)
+    for hostname in hostnames:
         assert hostname
         addresses = {
             record[4][0] for record in socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)

@@ -19,6 +19,12 @@ Government/custom runtime deployment is deferred.
 - An optional exercise executor, off by default: `deployExecutor` provisions its
   identity, task hub, and private bindings share, and `enableExecution` starts it. See
   the [opt-in executor rollout](#opt-in-executor-rollout).
+- Web app console, HTTP, and platform logs sent to the Log Analytics workspace, beside
+  the Container Apps logs.
+- Optional private-network probe jobs, off by default: `deployProbeJobs` with a
+  `validationImage` adds the `validate-dependencies` and `validate-blob` manual jobs and
+  their isolated `validation` task hub. See
+  [partial deployment and private dependency probes](#partial-deployment-and-private-dependency-probes).
 
 The first template deployment should set `deployApplications=false`. It creates
 infrastructure/identities but does not start an unconfigured application. Supply
@@ -45,7 +51,8 @@ Use `schedulerName` to adopt that same scheduler into the combined deployment.
 
 For an isolated validation deployment, `deployFoundry=true` additionally creates
 a private Foundry account/project and a GPT-5.6-luna (`2026-07-09`) DataZoneStandard
-deployment (50 capacity units), keeping inference within the deployment's data zone
+deployment (50 capacity units by default, set with `planningModelCapacity`), keeping
+inference within the deployment's data zone
 (US for a US-region account). Neither GPT-5.6-luna nor GPT-6-luna has a regional
 Standard offering; use `planningModelName`/`planningModelVersion` with
 `planningModelSku=Standard` only for a model that offers it in the target region.
@@ -157,6 +164,9 @@ Use authorized disposable application data to verify:
 - DNS resolving SQL, Blob, and Scheduler to private addresses from compute.
 - Logs correlated by request/instance IDs without prompts, asset content, or tokens.
 
+The [live acceptance runbook](live-acceptance.md) scripts these checks against a studio.
+It also runs the failure cases in a disposable validation environment deployed from
+this template, so they never break the studio itself.
 The health endpoint reports **process liveness**, not full dependency readiness.
 The Docker `validation` target contains test dependencies; production targets do
 not include the test suite. Real SQL integration still requires a dedicated
@@ -174,7 +184,10 @@ The test intentionally creates a synthetic workspace/scenario, immutable asset
 versions, a comment/revision, and a real model proposal that it explicitly applies.
 It verifies stale-save rejection and duplicate-request idempotency. Optional
 `GT_LIVE_API_ARTIFACT` records identifiers for follow-up persistence checks after
-restarting the application; it contains no credentials.
+restarting the application; it contains no credentials. The same file has opt-in
+tests for refused tokens, a second member's isolation and revocation, and that
+persistence check; the runbook's studio runner supplies their inputs and gets tokens
+from Azure CLI once the API registration preauthorizes it.
 
 The single worker replica is an initial baseline, not production HA or scale proof.
 Set appropriate scheduler history retention only after defining reconciliation
@@ -355,7 +368,8 @@ application administrator bootstrap, and end-to-end authoring remain incomplete.
 
 The `validation` image can run `backend/tests/test_azure_dependencies.py` in a
 manual Container Apps job inside the application network, explicitly enabled by
-`GT_TEST_AZURE_DEPENDENCIES=true`. Supply the actual service configuration:
+`GT_TEST_AZURE_DEPENDENCIES=true`. `deployProbeJobs=true` with `validationImage` set by
+digest creates both jobs below; otherwise, supply the actual service configuration:
 
 - Use the worker identity and `-k "not blob"` for private DNS, real Foundry proposal
   validation, and an actual managed Scheduler activity. Use a separate `validation`
@@ -363,7 +377,8 @@ manual Container Apps job inside the application network, explicitly enabled by
 - Use the API identity and `-k blob` for an actual private Blob upload/read/delete
   round-trip. The synthetic object has a unique `deployment-validation/` key.
 
-These probes never connect to SQL and are not a substitute for the database-backed
+These probes never connect to SQL; the DNS check only resolves the SQL server name
+from `GT_SQL_URL`. They are not a substitute for the database-backed
 tests or the full authoring/planning lifecycle. Do not run a continuously active
 planning worker before database setup. Jobs are manual and have no active replica
 after completing.

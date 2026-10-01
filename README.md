@@ -76,6 +76,7 @@ simulated data.
 - [Generic preparation and operation contracts](docs/preparation-contracts.md)
 - [Environment policies and exercise execution](docs/execution.md)
 - [Commercial deployment preparation and validation gates](docs/deployment.md)
+- [Live acceptance runbook and validation environment](docs/live-acceptance.md)
 - [Flood-response pilot and implementation handoff](docs/flood-response-pilot-plan.md)
 - [Security reporting](SECURITY.md)
 

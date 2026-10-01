@@ -1,0 +1,21 @@
+# Disposable validation environment for the fault scenarios in docs/live-acceptance.md.
+# Everything it creates lives in its own resource group, so `azd down --purge` removes all
+# of it (plus the Entra registrations the hooks created) without touching a real studio.
+name: gametheory-validation
+infra:
+  provider: bicep
+  path: infra
+  module: main
+hooks:
+  preprovision:
+    shell: pwsh
+    run: ./hooks/preprovision.ps1
+    interactive: true
+  postprovision:
+    shell: pwsh
+    run: ./hooks/postprovision.ps1
+    interactive: true
+  postdown:
+    shell: pwsh
+    run: ./hooks/postdown.ps1
+    interactive: true

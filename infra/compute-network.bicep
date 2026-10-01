@@ -56,3 +56,4 @@ output virtualNetworkId string = network.id
 output webSubnetId string = '${network.id}/subnets/web'
 output privateSubnetId string = '${network.id}/subnets/private'
 output containerEnvironmentId string = containerEnvironment.id
+output logAnalyticsWorkspaceId string = logs.id
