@@ -71,7 +71,7 @@ The current application provides:
 - Connection inventory kinds `sql`, `rest`, `graph`, and `mcp`, but no activated
   target-system connectors or exercise execution.
 
-The commercial deployment currently uses West US 3. This is context, not a
+The commercial deployment currently uses North Central US. This is context, not a
 requirement to move existing target servers or permission to reuse them.
 Read [architecture.md](architecture.md), [development.md](development.md), and
 [deployment.md](deployment.md) before changing application behavior.
