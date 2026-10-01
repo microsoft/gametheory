@@ -470,9 +470,9 @@ pydantic-settings==2.10.1 \
     --hash=sha256:06f0062169818d0f5524420a360d632d5857b83cffd4d42fe29597807a1614ee \
     --hash=sha256:a60952460b99cf661dc25c29c0ef171721f98bfcb52ef8d9ea4c943d7c8cc796
     # via -r requirements.in
-pyjwt==2.10.1 \
-    --hash=sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953 \
-    --hash=sha256:dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb
+pyjwt==2.15.0 \
+    --hash=sha256:7a3742debf6b879e912dbb9819ceec1594be812452b78c5f2e2dfc56564954f8 \
+    --hash=sha256:b11c5f9791d7bf51c2b39a81ed669f6b2dbbd669df2942f6c60167e9e3d1abe4
     # via -r requirements.in
 pyodbc==5.2.0 \
     --hash=sha256:057b8ede91b21d9f0ef58210d1ca1aad704e641ca68ac6b02f109d86b61d7402 \
