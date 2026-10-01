@@ -348,7 +348,9 @@ resource web 'Microsoft.Web/sites@2023-12-01' = if (deployApplications) {
     virtualNetworkSubnetId: webSubnet
     // The bindings share has no public endpoint. This routes only the platform's storage-mount
     // traffic through VNet integration; application traffic, including public services, is unchanged.
-    ...(executionOn ? { vnetContentShareEnabled: true } : {})
+    // A plain property, not a spread: a spread makes `properties` one expression, and App Service
+    // preflight then fails with a null reference when it creates a new web app.
+    vnetContentShareEnabled: executionOn
     siteConfig: {
       linuxFxVersion: 'DOCKER|${apiImage}'
       acrUseManagedIdentityCreds: true
