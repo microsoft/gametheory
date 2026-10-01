@@ -103,14 +103,30 @@ and the [run-check assistant rollout](deployment.md#run-check-assistant-rollout)
 | A11  | The deployed model produces a real planning proposal that is reviewed and applied, plus a run-check suggestion if the assistant is enabled | Partial |
 | A12† | The studio [live acceptance](deployment.md#live-acceptance) checklist, including `backend/tests/test_live_api.py`                          | Partial |
 
-A11: from inside the application network, the deployed model returned a schema-valid
-planning proposal with a measurable objective in 5.1 seconds. A proposal that is
-reviewed and applied in the studio is still required. The run-check assistant is off,
-so no suggestion is needed yet.
+A11: from inside the application network, the deployed model returned schema-valid
+planning proposals, each adding an objective with a success criterion, on 2026-09-30
+and again on 2026-10-01 (runbook check S6). A proposal that is reviewed and applied in
+the studio (check A) is still required. The run-check assistant is off, so no
+suggestion is needed yet.
 
-A12: private DNS for Blob, Scheduler, and Foundry, a managed Scheduler activity, and a
-private Blob round trip passed. Sign-in, authoring, SQL access by the runtime
-identities, `test_live_api.py`, and the rest of the checklist are open.
+A12: the [live acceptance runbook](live-acceptance.md) scripts every check, and its
+[validation environment](live-acceptance.md#validation-environment) runs the fault
+scenarios in a separate resource group. Results on 2026-10-01:
+
+- Passed: private DNS for SQL, Blob, Scheduler, and Foundry, a real proposal, and a
+  managed Scheduler activity (S6); a private Blob round trip (S7); and rejection of
+  missing, malformed, and wrong-audience tokens (part of S2).
+- The worker-restart job (F1) succeeded against a managed Scheduler. It ran before a
+  skipped test could fail a job, so a rerun must confirm it.
+- The web app's console, HTTP, and platform logs now reach Log Analytics, which S8 reads.
+- Fixed: `infra/main.bicep` could not create a new web app (App Service preflight
+  failed), and the Consumption Scheduler task hub limit blocked the probe hub, which
+  moved to `infra/probes.bicep`.
+- Open: sign-in (S1), authoring and the reviewed proposal, which exercise SQL access by
+  the runtime identities (S3 and A), workspace isolation (S4), persistence across a
+  restart (S5), log correlation (S8), the wrong-tenant denial, and F0 and F2 through F5.
+  These need an owner token, so Azure CLI must first be preauthorized on the API
+  registration, which needs an interactive sign-in.
 
 ### P2: Deployable executor
 
