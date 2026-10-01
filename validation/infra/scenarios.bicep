@@ -299,7 +299,8 @@ resource setupJob 'Microsoft.App/jobs@2024-03-01' = {
       containers: [{
         name: 'setup'
         image: apiImage
-        command: ['/bin/sh', '-c', setupScript]
+        // Checkouts with CRLF line endings would otherwise break the shell script.
+        command: ['/bin/sh', '-c', replace(setupScript, '\r', '')]
         resources: { cpu: 1, memory: '2Gi' }
         env: [
           { name: 'AZURE_CLIENT_ID', value: operator.properties.clientId }

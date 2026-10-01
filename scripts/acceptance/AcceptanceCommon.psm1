@@ -343,13 +343,17 @@ function Write-AcceptanceSummary {
 }
 
 function Get-SourceTag {
-    # Commit-based tag; uncommitted changes get a unique suffix so images are never confused.
+    # Content-addressed: the hash of the Git objects a build reads, so unrelated commits reuse the
+    # image. Uncommitted changes to those paths get a unique suffix so images are never confused.
+    param([string[]] $Paths = @('.'))
     $root = Get-RepositoryRoot
-    $commit = ((git -C $root rev-parse --short=12 HEAD) | Out-String).Trim()
-    if (git -C $root status --porcelain) {
-        return "$commit-dirty-$((Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmss'))"
+    $objects = foreach ($path in $Paths) { ((git -C $root rev-parse "HEAD:$path") | Out-String).Trim() }
+    $bytes = [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($objects -join ' '))
+    $hash = [Convert]::ToHexString($bytes).Substring(0, 12).ToLowerInvariant()
+    if (git -C $root status --porcelain -- @Paths) {
+        return "$hash-dirty-$((Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmss'))"
     }
-    $commit
+    $hash
 }
 
 function Publish-SourceImage {
@@ -358,8 +362,16 @@ function Publish-SourceImage {
         [Parameter(Mandatory)] [string] $Registry,
         [Parameter(Mandatory)] [string] $Repository,
         [Parameter(Mandatory)] [string] $Target,
-        [string] $Tag = (Get-SourceTag)
+        [string] $Tag
     )
+    if (-not $Tag) {
+        # Only the API image bundles the web app.
+        $inputs = if ($Target -eq 'api') {
+            @('backend', 'apps/web', 'package.json', 'package-lock.json', 'Dockerfile')
+        }
+        else { @('backend', 'Dockerfile') }
+        $Tag = Get-SourceTag -Paths $inputs
+    }
     $root = Get-RepositoryRoot
     $server = Get-AzText acr show --name $Registry --query loginServer
     $digest = & az acr repository show --name $Registry --image "${Repository}:$Tag" --query digest --output tsv --only-show-errors 2>$null
